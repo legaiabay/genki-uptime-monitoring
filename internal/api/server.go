@@ -57,6 +57,8 @@ func (s *Server) registerRoutes() {
 	appSettingsHandler := handlers.NewAppSettingsHandler(s.db)
 	protected.GET("/settings/general", appSettingsHandler.Get)
 	protected.PUT("/settings/general", appSettingsHandler.Update)
+	protected.POST("/settings/reset-data", appSettingsHandler.ResetAllData)
+	protected.POST("/settings/reset-monitoring", appSettingsHandler.ResetMonitoringData)
 
 	// Monitors
 	monitorHandler := handlers.NewMonitorHandler(s.db)

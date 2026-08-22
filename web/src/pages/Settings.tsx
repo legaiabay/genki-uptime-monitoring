@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, User, Key, Globe, Loader2, AlertCircle, Copy, Trash2, Plus, CheckCheck, BookOpen, Terminal, Download } from 'lucide-react'
+import { Check, User, Key, Globe, Loader2, AlertCircle, Copy, Trash2, Plus, CheckCheck, BookOpen, Terminal, Download, TriangleAlert } from 'lucide-react'
+import api from '@/lib/api'
 import Card from '@/components/ui/Card'
 import {
   useProfile, useUpdateProfile, useChangePassword,
@@ -717,6 +718,118 @@ monitors = r.json()['data']`
   )
 }
 
+// ── Reset confirm modal ───────────────────────────────────────────────────────
+
+type ResetScope = 'monitoring' | 'all'
+
+const RESET_CONFIG: Record<ResetScope, {
+  title: string
+  description: React.ReactNode
+  confirmLabel: string
+  confirmWord: string
+}> = {
+  monitoring: {
+    title: 'Reset Monitoring Data',
+    description: (
+      <>
+        This will <strong style={{ color: '#fc8181' }}>permanently delete</strong> all monitors,
+        check logs, incidents, and heartbeats. Users, API keys, notification channels, and settings
+        will be preserved. You will stay logged in.
+        <br /><br />
+        This action <strong style={{ color: '#fc8181' }}>cannot be undone</strong>.
+      </>
+    ),
+    confirmLabel: 'Reset Monitoring Data',
+    confirmWord: 'RESET',
+  },
+  all: {
+    title: 'Reset All Data',
+    description: (
+      <>
+        This will <strong style={{ color: '#fc8181' }}>permanently delete</strong> all monitors,
+        incidents, heartbeats, API keys, notification channels, settings, and users. The app will
+        return to first-boot state and you will be logged out.
+        <br /><br />
+        This action <strong style={{ color: '#fc8181' }}>cannot be undone</strong>.
+      </>
+    ),
+    confirmLabel: 'Reset Everything',
+    confirmWord: 'RESET ALL',
+  },
+}
+
+function ResetConfirmModal({ scope, onClose, onConfirm, busy }: {
+  scope: ResetScope
+  onClose: () => void
+  onConfirm: () => void
+  busy: boolean
+}) {
+  const [typed, setTyped] = useState('')
+  const cfg = RESET_CONFIG[scope]
+  const match = typed === cfg.confirmWord
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+    }} onClick={e => { if (!busy && e.target === e.currentTarget) onClose() }}>
+      <div style={{ background: '#1a1a1a', border: '1px solid #3a1a1a', borderRadius: 10, padding: 24, width: 460, maxWidth: '90vw' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(229,62,62,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <TriangleAlert size={16} color="#e53e3e" />
+          </div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#e8e8e8' }}>{cfg.title}</div>
+        </div>
+
+        <p style={{ fontSize: 13, color: '#888', lineHeight: 1.6, marginBottom: 16 }}>
+          {cfg.description}
+        </p>
+
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ ...labelStyle, marginBottom: 8 }}>
+            Type <code style={{ color: '#fc8181', background: '#2a1010', padding: '1px 6px', borderRadius: 3 }}>{cfg.confirmWord}</code> to confirm
+          </label>
+          <input
+            autoFocus
+            style={{ ...inputStyle, borderColor: match ? '#e53e3e' : '#2a2a2a' }}
+            placeholder={cfg.confirmWord}
+            value={typed}
+            onChange={e => setTyped(e.target.value.toUpperCase())}
+            onKeyDown={e => e.key === 'Enter' && match && !busy && onConfirm()}
+          />
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button
+            onClick={onClose}
+            disabled={busy}
+            style={{ background: 'none', border: '1px solid #2a2a2a', borderRadius: 6, color: '#888', fontSize: 13, padding: '7px 16px', cursor: busy ? 'not-allowed' : 'pointer' }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={!match || busy}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: match && !busy ? '#e53e3e' : '#5a2020',
+              border: 'none', borderRadius: 6,
+              color: match ? '#fff' : '#7a4040',
+              fontSize: 13, fontWeight: 500, padding: '7px 16px',
+              cursor: !match || busy ? 'not-allowed' : 'pointer',
+              transition: 'background 0.2s, color 0.2s',
+            }}
+          >
+            {busy
+              ? <><Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Resetting…</>
+              : <><Trash2 size={13} /> {cfg.confirmLabel}</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── General tab ───────────────────────────────────────────────────────────────
 
 function GeneralTab() {
@@ -728,6 +841,10 @@ function GeneralTab() {
   })
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [saveError, setSaveError] = useState('')
+
+  const [showResetModal, setShowResetModal] = useState<ResetScope | null>(null)
+  const [resetBusy, setResetBusy] = useState(false)
+  const [resetError, setResetError] = useState('')
 
   useEffect(() => {
     if (settings) {
@@ -756,52 +873,134 @@ function GeneralTab() {
     })
   }
 
+  async function handleReset() {
+    if (!showResetModal) return
+    setResetBusy(true)
+    setResetError('')
+    try {
+      if (showResetModal === 'monitoring') {
+        await api.post('/settings/reset-monitoring')
+        setShowResetModal(null)
+        setResetBusy(false)
+      } else {
+        await api.post('/settings/reset-data')
+        localStorage.removeItem('token')
+        window.location.href = '/register'
+      }
+    } catch (err: any) {
+      setResetError(err?.response?.data?.message ?? 'Reset failed')
+      setResetBusy(false)
+    }
+  }
+
   if (isLoading) {
     return <div style={{ color: '#555', fontSize: 13, padding: 20 }}>Loading…</div>
   }
 
   return (
-    <Card style={{ padding: '20px' }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8', marginBottom: 16 }}>General Settings</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <div>
-            <label style={labelStyle}>Site Name</label>
-            <input style={inputStyle} value={form.site_name}
-              onChange={e => setForm(f => ({ ...f, site_name: e.target.value }))} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Card style={{ padding: '20px' }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8', marginBottom: 16 }}>General Settings</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div>
+              <label style={labelStyle}>Site Name</label>
+              <input style={inputStyle} value={form.site_name}
+                onChange={e => setForm(f => ({ ...f, site_name: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Timezone</label>
+              <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.timezone}
+                onChange={e => setForm(f => ({ ...f, timezone: e.target.value }))}>
+                <option value="Asia/Jakarta">Asia/Jakarta (WIB)</option>
+                <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
+                <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
+                <option value="UTC">UTC</option>
+                <option value="Europe/London">Europe/London (GMT)</option>
+                <option value="America/New_York">America/New_York (EST)</option>
+                <option value="America/Los_Angeles">America/Los_Angeles (PST)</option>
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Default Check Interval (seconds)</label>
+              <input style={inputStyle} type="number" min="10" value={form.default_interval}
+                onChange={e => setForm(f => ({ ...f, default_interval: e.target.value }))} />
+            </div>
+            <div>
+              <label style={labelStyle}>Data Retention (days)</label>
+              <input style={inputStyle} type="number" min="1" value={form.retention_days}
+                onChange={e => setForm(f => ({ ...f, retention_days: e.target.value }))} />
+            </div>
           </div>
-          <div>
-            <label style={labelStyle}>Timezone</label>
-            <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.timezone}
-              onChange={e => setForm(f => ({ ...f, timezone: e.target.value }))}>
-              <option value="Asia/Jakarta">Asia/Jakarta (WIB)</option>
-              <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
-              <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
-              <option value="UTC">UTC</option>
-              <option value="Europe/London">Europe/London (GMT)</option>
-              <option value="America/New_York">America/New_York (EST)</option>
-              <option value="America/Los_Angeles">America/Los_Angeles (PST)</option>
-            </select>
+
+          {saveError && <ErrorMsg msg={saveError} />}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+            <SaveButton state={saveState} onClick={handleSave} />
           </div>
-          <div>
-            <label style={labelStyle}>Default Check Interval (seconds)</label>
-            <input style={inputStyle} type="number" min="10" value={form.default_interval}
-              onChange={e => setForm(f => ({ ...f, default_interval: e.target.value }))} />
+        </div>
+      </Card>
+
+      {/* ── Danger Zone ── */}
+      <Card style={{ padding: '20px', border: '1px solid #3a1a1a' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <TriangleAlert size={14} color="#e53e3e" />
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#e53e3e' }}>Danger Zone</div>
+        </div>
+        <p style={{ fontSize: 12, color: '#666', marginBottom: 16, lineHeight: 1.6 }}>
+          Destructive actions that cannot be reversed. Proceed with extreme caution.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {/* Row 1 — monitoring data only */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: '#160a0a', border: '1px solid #2a1212', borderRadius: 8 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: '#e8e8e8', marginBottom: 3 }}>Reset Monitoring Data</div>
+              <div style={{ fontSize: 12, color: '#666' }}>Delete all monitors, logs, incidents, and heartbeats. Users and settings are preserved.</div>
+            </div>
+            <button
+              onClick={() => { setResetError(''); setShowResetModal('monitoring') }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 16,
+                background: 'transparent', border: '1px solid #555', borderRadius: 6,
+                color: '#aaa', fontSize: 12, fontWeight: 500, padding: '7px 14px', cursor: 'pointer',
+              }}
+            >
+              <Trash2 size={13} /> Reset Monitoring
+            </button>
           </div>
-          <div>
-            <label style={labelStyle}>Data Retention (days)</label>
-            <input style={inputStyle} type="number" min="1" value={form.retention_days}
-              onChange={e => setForm(f => ({ ...f, retention_days: e.target.value }))} />
+
+          {/* Row 2 — everything including users */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: '#160a0a', border: '1px solid #2a1212', borderRadius: 8 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: '#e8e8e8', marginBottom: 3 }}>Reset All Data</div>
+              <div style={{ fontSize: 12, color: '#666' }}>Delete everything including users and settings. App returns to first-boot state, you will be logged out.</div>
+            </div>
+            <button
+              onClick={() => { setResetError(''); setShowResetModal('all') }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 16,
+                background: 'transparent', border: '1px solid #e53e3e', borderRadius: 6,
+                color: '#e53e3e', fontSize: 12, fontWeight: 500, padding: '7px 14px', cursor: 'pointer',
+              }}
+            >
+              <Trash2 size={13} /> Reset Everything
+            </button>
           </div>
         </div>
 
-        {saveError && <ErrorMsg msg={saveError} />}
+        {resetError && <div style={{ marginTop: 10 }}><ErrorMsg msg={resetError} /></div>}
+      </Card>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-          <SaveButton state={saveState} onClick={handleSave} />
-        </div>
-      </div>
-    </Card>
+      {showResetModal && (
+        <ResetConfirmModal
+          scope={showResetModal}
+          busy={resetBusy}
+          onClose={() => setShowResetModal(null)}
+          onConfirm={handleReset}
+        />
+      )}
+    </div>
   )
 }
 

@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/logo.png" alt="Genki" width="160" />
+
 # Genki
 
 **Self-hosted uptime monitoring with a clean dark UI**

@@ -7,6 +7,53 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+// ResetMonitoringData truncates only monitoring-related tables (monitors, logs,
+// incidents, heartbeats). Users, API keys, notification channels, and settings
+// are preserved. The caller stays logged in.
+func (h *AppSettingsHandler) ResetMonitoringData(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	tables := []string{
+		"monitor_logs",
+		"incidents",
+		"heartbeats",
+		"monitors",
+	}
+
+	for _, t := range tables {
+		if _, err := h.db.ExecContext(ctx, "TRUNCATE TABLE "+t+" CASCADE"); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to reset table: "+t+": "+err.Error())
+		}
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{"message": "monitoring data has been reset"})
+}
+
+// ResetAllData truncates all application tables (including users) so the app
+// returns to a first-boot state. The caller must log out immediately after.
+func (h *AppSettingsHandler) ResetAllData(c echo.Context) error {
+	ctx := c.Request().Context()
+
+	tables := []string{
+		"monitor_logs",
+		"incidents",
+		"heartbeats",
+		"api_keys",
+		"notification_channels",
+		"monitors",
+		"app_settings",
+		"users",
+	}
+
+	for _, t := range tables {
+		if _, err := h.db.ExecContext(ctx, "TRUNCATE TABLE "+t+" CASCADE"); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to reset table: "+t+": "+err.Error())
+		}
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{"message": "all data has been reset"})
+}
+
 type AppSettingsHandler struct {
 	db *sqlx.DB
 }
