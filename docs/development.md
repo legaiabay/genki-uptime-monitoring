@@ -39,6 +39,8 @@ cd web && npm install && npm run dev
 
 Vite proxies `/api` and `/ws` to the Go backend automatically. The proxy target is read from `web/.env`.
 
+On first run, the app redirects to `http://localhost:5173/setup` — fill in your name, email, and password to create the admin account. After that, login is via `/login`.
+
 ## Frontend Environment Variables
 
 `web/.env` controls the Vite dev server proxy. It is separate from the root `.env` (which is for the Go backend).
@@ -52,18 +54,11 @@ Copy `web/.env.example` to `web/.env` to get started. The file is gitignored —
 
 > These variables only affect the local dev server. They have no effect on the production build.
 
-Default credentials:
-
-```
-Email:    admin@genki.local
-Password: admin123
-```
-
 ## Project Structure
 
 ```
 genki-uptime-monitoring/
-├── cmd/server/main.go          # Entrypoint: config → DB → migrate → seed → scheduler → HTTP
+│── cmd/server/main.go          # Entrypoint: config → DB → migrate → scheduler → HTTP
 ├── internal/
 │   ├── api/
 │   │   ├── server.go           # Echo setup, all route registrations
@@ -87,7 +82,6 @@ genki-uptime-monitoring/
 │   ├── config/config.go        # Env var loading
 │   ├── database/
 │   │   ├── database.go         # Connect + goose migrate
-│   │   ├── seed.go             # Default admin on first boot
 │   │   └── migrations/         # Goose SQL migration files
 │   ├── models/                 # Go structs matching DB schema
 │   ├── notifier/               # Channel senders + fan-out dispatcher

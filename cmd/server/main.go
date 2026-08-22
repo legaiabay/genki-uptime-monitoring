@@ -33,11 +33,6 @@ func main() {
 		log.Fatalf("failed to run migrations: %v", err)
 	}
 
-	// Seed default admin user (only if no users exist)
-	if err := database.Seed(db); err != nil {
-		log.Printf("warning: seed failed: %v", err)
-	}
-
 	// Init scheduler
 	sched := scheduler.New(db)
 	sched.Start()

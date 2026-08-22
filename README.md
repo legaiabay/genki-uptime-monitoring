@@ -49,9 +49,9 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Open `http://localhost:8080`. On first run, Genki detects there are no users and redirects you to the setup screen where you create your admin account (name, email, password). After submitting, you're logged in automatically.
+Open `http://localhost:8080`. On first run, Genki detects there are no users and redirects to `/setup` where you create your admin account (name, email, password). After submitting, you're logged in automatically.
 
-> Registration is only available on the first run. Once an admin account exists, the setup screen is no longer accessible.
+> The setup screen is only available on first run. Once an admin account exists, it redirects to `/login`.
 
 ### Local Development
 
@@ -64,7 +64,7 @@ air                      # Go backend with live reload (separate terminal)
 cd web && npm install && npm run dev  # frontend dev server
 ```
 
-Open `http://localhost:5173`. On first run you'll be prompted to create your admin account, same as above.
+Open `http://localhost:5173`. On first run you'll be redirected to `/setup` to create your admin account, same as above.
 
 See [docs/development.md](docs/development.md) for the full local setup guide.
 

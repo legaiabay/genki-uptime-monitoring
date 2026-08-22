@@ -53,7 +53,7 @@ PostgreSQL 16. Schema managed via Goose migrations in `internal/database/migrati
 
 ```
 genki-uptime-monitoring/
-├── cmd/server/main.go                   # Entrypoint: config → DB → migrate → seed → scheduler → HTTP
+├── cmd/server/main.go                   # Entrypoint: config → DB → migrate → scheduler → HTTP
 ├── internal/
 │   ├── api/
 │   │   ├── server.go                    # Echo setup, all route registrations
@@ -77,7 +77,6 @@ genki-uptime-monitoring/
 │   ├── config/config.go                 # Env var loading
 │   ├── database/
 │   │   ├── database.go                  # Connect + goose migrate
-│   │   ├── seed.go                      # Default admin on first boot
 │   │   └── migrations/
 │   │       ├── 00001_init.sql           # users, monitors, monitor_logs, incidents, heartbeats, api_keys
 │   │       ├── 00002_add_monitor_public.sql    # monitors.public + public_slug
@@ -265,9 +264,7 @@ cd web && npm run dev
 Frontend at `http://localhost:5173`, Go API at `http://localhost:8876`.
 Vite proxies `/api` and `/ws` to the Go server using targets from `web/.env`.
 
-Default login after first start:
-- Email: `admin@genki.local`
-- Password: `admin123`
+On first run, the app redirects to `/setup` — create your admin account there. After that, login is via `/login`.
 
 ---
 

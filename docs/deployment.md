@@ -66,7 +66,7 @@ your.domain.com {
 
 - [ ] Never commit `.env` — it is in `.gitignore`
 - [ ] `JWT_SECRET` must be at least 32 characters (`openssl rand -hex 32`)
-- [ ] Change the default `admin@genki.local` / `admin123` credentials immediately
+- [ ] Complete the `/setup` screen on first run to create your admin account
 - [ ] Run Genki behind a reverse proxy with TLS in production
 - [ ] Restrict WebSocket `CheckOrigin` to your own domain (currently allows all origins)
 - [ ] Passwords are hashed with bcrypt — no plain-text storage
