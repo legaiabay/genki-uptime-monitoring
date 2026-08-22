@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/api/handlers"
 	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/api/middleware"
@@ -112,11 +111,8 @@ func (s *Server) registerRoutes() {
 	protected.GET("/ws", wsHandler.Handle)
 
 	// Serve React frontend (catch-all)
-	// Note: frontend is served from embedded static files after `npm run build`
-	// The embed directive is activated in production build (see Makefile/Dockerfile)
-	s.echo.GET("/*", func(c echo.Context) error {
-		return c.String(http.StatusOK, "Frontend not built yet. Run: cd web && npm run build")
-	})
+	// Frontend is embedded at build time from internal/api/web/dist
+	s.serveStaticFiles()
 }
 
 func (s *Server) Start(port string) error {

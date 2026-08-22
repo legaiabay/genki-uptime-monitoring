@@ -45,6 +45,7 @@ PostgreSQL 16. Schema managed via Goose migrations in `internal/database/migrati
 - **Dev DB**: `docker compose -f docker-compose.dev.yml up -d`
 - **Dev backend**: `air` (live reload)
 - **Dev frontend**: `cd web && npm run dev` (proxies `/api` and `/ws` to Go on `:8876`)
+- **Frontend env**: `web/.env` — Vite reads `VITE_API_TARGET` and `VITE_WS_TARGET` for proxy config (dev only, gitignored)
 
 ---
 
@@ -90,6 +91,8 @@ genki-uptime-monitoring/
 │   │   └── dispatcher.go               # Load enabled channels from DB, fan-out goroutines
 │   └── scheduler/scheduler.go          # Cron every 10s: check due monitors, insert logs, fire notifs
 ├── web/                                 # React + Vite frontend
+│   ├── .env                             # Frontend env (gitignored) — VITE_API_TARGET, VITE_WS_TARGET
+│   ├── .env.example                     # Template for web/.env
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── layout/                  # Sidebar, Layout
@@ -154,6 +157,8 @@ All protected endpoints accept `Authorization: Bearer <jwt>` **or** `Authorizati
 
 ## Environment Variables
 
+### Backend (`.env`)
+
 | Variable | Required | Description |
 |---|---|---|
 | `APP_ENV` | No | `development` or `production` (default: `development`) |
@@ -162,6 +167,17 @@ All protected endpoints accept `Authorization: Bearer <jwt>` **or** `Authorizati
 | `JWT_SECRET` | Yes | Min 32-char random string |
 
 Copy `.env.example` to `.env` for local development. **Never commit `.env`.**
+
+### Frontend (`web/.env`)
+
+Only used by the Vite dev server — has no effect on production builds.
+
+| Variable | Default | Description |
+|---|---|---|
+| `VITE_API_TARGET` | `http://localhost:8876` | Backend URL for `/api` proxy |
+| `VITE_WS_TARGET` | `ws://localhost:8876` | Backend URL for `/ws` proxy |
+
+Copy `web/.env.example` to `web/.env` for local development. **Never commit `web/.env`** (it is gitignored in `web/.gitignore`).
 
 ---
 
@@ -233,18 +249,21 @@ Notifications are dispatched as goroutines by `notifier.Dispatcher` when:
 # 1. Start PostgreSQL
 make dev-db
 
-# 2. Copy and fill environment
+# 2. Copy and fill backend environment
 cp .env.example .env
 
-# 3. Start Go with live reload
+# 3. Copy and fill frontend environment
+cp web/.env.example web/.env
+
+# 4. Start Go with live reload
 air
 
-# 4. Start frontend dev server (separate terminal)
+# 5. Start frontend dev server (separate terminal)
 cd web && npm run dev
 ```
 
 Frontend at `http://localhost:5173`, Go API at `http://localhost:8876`.
-Vite proxies `/api` and `/ws` to the Go server.
+Vite proxies `/api` and `/ws` to the Go server using targets from `web/.env`.
 
 Default login after first start:
 - Email: `admin@genki.local`

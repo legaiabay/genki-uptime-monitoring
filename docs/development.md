@@ -17,14 +17,18 @@ go install github.com/air-verse/air@latest
 # 1. Start local PostgreSQL via Docker
 make dev-db
 
-# 2. Configure environment
+# 2. Configure backend environment
 cp .env.example .env
 # Edit .env as needed
 
-# 3. Start Go backend with live reload
+# 3. Configure frontend environment
+cp web/.env.example web/.env
+# Edit web/.env if your backend runs on a different port
+
+# 4. Start Go backend with live reload
 air
 
-# 4. Start frontend dev server (separate terminal)
+# 5. Start frontend dev server (separate terminal)
 cd web && npm install && npm run dev
 ```
 
@@ -33,7 +37,20 @@ cd web && npm install && npm run dev
 | Frontend | `http://localhost:5173` |
 | API | `http://localhost:8876` |
 
-Vite proxies `/api` and `/ws` to the Go backend automatically.
+Vite proxies `/api` and `/ws` to the Go backend automatically. The proxy target is read from `web/.env`.
+
+## Frontend Environment Variables
+
+`web/.env` controls the Vite dev server proxy. It is separate from the root `.env` (which is for the Go backend).
+
+| Variable | Default | Description |
+|---|---|---|
+| `VITE_API_TARGET` | `http://localhost:8876` | Backend URL for `/api` proxy |
+| `VITE_WS_TARGET` | `ws://localhost:8876` | Backend URL for `/ws` proxy |
+
+Copy `web/.env.example` to `web/.env` to get started. The file is gitignored — never commit it.
+
+> These variables only affect the local dev server. They have no effect on the production build.
 
 Default credentials:
 
@@ -76,6 +93,8 @@ genki-uptime-monitoring/
 │   ├── notifier/               # Channel senders + fan-out dispatcher
 │   └── scheduler/scheduler.go  # Cron: check due monitors, insert logs, fire notifs
 ├── web/
+│   ├── .env                    # Frontend env (gitignored) — VITE_API_TARGET, VITE_WS_TARGET
+│   ├── .env.example            # Template for web/.env
 │   └── src/
 │       ├── components/         # Layout, UI primitives
 │       ├── hooks/              # TanStack Query hooks (one file per resource)

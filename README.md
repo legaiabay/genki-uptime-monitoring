@@ -1,8 +1,6 @@
 <div align="center">
 
-<img src="docs/logo.png" alt="Genki" width="160" />
-
-# Genki
+<img src="docs/logo.png" alt="Genki" width="400" />
 
 **Self-hosted uptime monitoring with a clean dark UI**
 
@@ -51,28 +49,28 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Open `http://localhost:8080` and sign in:
+Open `http://localhost:8080`. On first run, Genki detects there are no users and redirects you to the setup screen where you create your admin account (name, email, password). After submitting, you're logged in automatically.
 
-```
-Email:    admin@genki.local
-Password: admin123
-```
-
-> Change the password immediately via **Settings → Profile**.
+> Registration is only available on the first run. Once an admin account exists, the setup screen is no longer accessible.
 
 ### Local Development
 
 ```bash
-make dev-db          # start local PostgreSQL
-cp .env.example .env # configure environment
+make dev-db              # start local PostgreSQL
+cp .env.example .env     # configure backend environment
+cp web/.env.example web/.env  # configure frontend dev proxy
 
-air                  # Go backend with live reload (separate terminal)
+air                      # Go backend with live reload (separate terminal)
 cd web && npm install && npm run dev  # frontend dev server
 ```
+
+Open `http://localhost:5173`. On first run you'll be prompted to create your admin account, same as above.
 
 See [docs/development.md](docs/development.md) for the full local setup guide.
 
 ## Configuration
+
+### Backend (`.env`)
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
@@ -80,6 +78,15 @@ See [docs/development.md](docs/development.md) for the full local setup guide.
 | `JWT_SECRET` | Yes | — | Random string, min 32 characters |
 | `APP_ENV` | No | `development` | `development` or `production` |
 | `PORT` | No | `:8080` | HTTP listen address |
+
+### Frontend (`web/.env`)
+
+Only used by the Vite dev server — has no effect on production builds.
+
+| Variable | Default | Description |
+|---|---|---|
+| `VITE_API_TARGET` | `http://localhost:8876` | Backend URL for `/api` proxy |
+| `VITE_WS_TARGET` | `ws://localhost:8876` | Backend URL for `/ws` proxy |
 
 ```bash
 # Generate a secure JWT secret
