@@ -1,0 +1,11 @@
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+*.md
+web/node_modules
+web/.vite
+tmp
+.air.toml
+docker-compose.dev.yml

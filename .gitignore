@@ -1,0 +1,47 @@
+# ─── Environment & Secrets ───────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+secrets.json
+service-account*.json
+
+# ─── Go ──────────────────────────────────────────────────────────────────────
+/bin/
+/tmp/
+*.exe
+*.test
+*.prof
+coverage.out
+
+# ─── Frontend ─────────────────────────────────────────────────────────────────
+web/node_modules/
+web/dist/
+web/.vite/
+
+# ─── IDE ──────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*.suo
+.project
+.classpath
+
+# ─── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+build-errors.log
