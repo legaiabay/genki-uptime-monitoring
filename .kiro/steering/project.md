@@ -58,6 +58,7 @@ genki-uptime-monitoring/
 │   │   ├── server.go                    # Echo setup, all route registrations
 │   │   ├── static.go                    # Embed note (prod: web/dist embedded here)
 │   │   ├── handlers/
+│   │   │   ├── apikey.go                # CRUD /api-keys + LookupAPIKey helper
 │   │   │   ├── auth.go                  # POST /auth/login, /auth/register
 │   │   │   ├── monitor.go               # CRUD + /logs + /visibility (PATCH)
 │   │   │   ├── incident.go              # List/Get/Update incidents
@@ -67,9 +68,10 @@ genki-uptime-monitoring/
 │   │   │   ├── notification.go          # CRUD notification_channels
 │   │   │   ├── public.go                # GET /public/status (no auth)
 │   │   │   ├── profile.go               # GET/PUT /profile, POST /profile/password
+│   │   │   ├── websocket.go             # WebSocket hub
 │   │   │   └── appsettings.go           # GET/PUT /settings/general
 │   │   └── middleware/
-│   │       └── jwt.go                   # JWT validation, GetUserID(c)
+│   │       └── jwt.go                   # JWT + API key validation, GetUserID(c)
 │   ├── checker/checker.go               # HTTP healthcheck logic → Result
 │   ├── config/config.go                 # Env var loading
 │   ├── database/
@@ -94,12 +96,12 @@ genki-uptime-monitoring/
 │   │   │   └── ui/                      # Card, StatusBadge, MiniSparkline, UptimeBars, NextCheckBar
 │   │   ├── hooks/                       # useMonitors, useIncidents, useHeartbeats, useProfile,
 │   │   │                                # useNotifications, useUptimeSeries, useOverviewStats,
-│   │   │                                # usePublicStatus, useSiteTitle
+│   │   │                                # usePublicStatus, useSiteTitle, useApiKeys
 │   │   ├── lib/api.ts                   # Axios instance with JWT interceptor + 401 redirect
 │   │   ├── pages/                       # Overview, Monitors, Incidents, Heartbeats,
 │   │   │                                # Notifications, Settings, Login, PublicStatus
 │   │   ├── store/                       # Zustand stores (UI state)
-│   │   ├── types/index.ts               # Shared TypeScript types
+│   │   ├── types/index.ts               # Shared TypeScript types (incl. ApiKey)
 │   │   └── App.tsx                      # QueryClient, BrowserRouter, routes
 │   └── package.json
 ├── docker-compose.yml                   # Production: app + postgres
@@ -123,7 +125,10 @@ genki-uptime-monitoring/
 | GET  | `/api/v1/public/status` | All public monitors + logs |
 | GET  | `/api/v1/public/status/:slug` | Single public monitor |
 
-### Protected (Bearer JWT)
+### Protected (Bearer JWT or API key)
+
+All protected endpoints accept `Authorization: Bearer <jwt>` **or** `Authorization: Bearer gk_<apikey>`.
+
 | Method | Path | Description |
 |---|---|---|
 | GET/PUT | `/api/v1/profile` | Get/update user profile |
@@ -141,6 +146,9 @@ genki-uptime-monitoring/
 | GET/POST | `/api/v1/notifications` | List/upsert notification channels |
 | DELETE | `/api/v1/notifications/:id` | Remove channel |
 | PATCH | `/api/v1/notifications/:id/enabled` | Toggle channel on/off |
+| GET | `/api/v1/api-keys` | List API keys (key values masked) |
+| POST | `/api/v1/api-keys` | Generate new API key (full key returned once) |
+| DELETE | `/api/v1/api-keys/:id` | Revoke API key |
 
 ---
 
@@ -162,9 +170,21 @@ Copy `.env.example` to `.env` for local development. **Never commit `.env`.**
 - All migrations are in `internal/database/migrations/` as `NNNNN_description.sql`
 - Goose runs migrations automatically on app start via embedded FS
 - New migrations: `make migrate-create name=describe_change`
+- Never edit existing migration files — always add a new one
 - `incidents.monitor_id` is nullable — incidents survive monitor deletion (`ON DELETE SET NULL`)
 - `notification_channels.type` is UNIQUE — one config per channel type
 - `app_settings` is a key-value table with upsert semantics
+- `api_keys.key` is UNIQUE; keys start with `gk_` followed by 64 hex chars
+
+---
+
+## API Keys
+
+- Keys are generated with `crypto/rand` — format: `gk_` + 64 random hex chars
+- The full key is returned **once** at creation time and never again (list endpoint masks to prefix + `…`)
+- `api_keys.last_used` is updated asynchronously (goroutine) on each successful request
+- Expired keys (past `expires_at`) are rejected; `expires_at = NULL` means no expiry
+- The JWT middleware (`middleware.JWT(secret, db)`) handles both JWT and API key auth transparently — downstream handlers call `middleware.GetUserID(c)` as usual
 
 ---
 
@@ -259,3 +279,4 @@ The Dockerfile uses a 3-stage build:
 - WebSocket `CheckOrigin` should be restricted in production (currently allows all origins)
 - Passwords are hashed with bcrypt (cost=10)
 - All SQL queries use parameterized placeholders
+- API keys use `crypto/rand` — never `math/rand`

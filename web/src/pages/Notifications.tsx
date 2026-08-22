@@ -157,6 +157,46 @@ function ChannelCard({ icon, title, desc, enabled, onToggle, children }: {
   )
 }
 
+// ── WebhookPayloadPreview ─────────────────────────────────────────────────────
+
+const WEBHOOK_PAYLOAD_DOWN = {
+  event: 'down',
+  monitor_name: 'My API',
+  monitor_url: 'https://api.example.com/health',
+  status: 'down',
+  response_time: 0,
+  error_message: 'Connection refused',
+  checked_at: '2026-08-23T10:00:00Z',
+  message: '🔴 My API is down\nURL: https://api.example.com/health\nError: Connection refused',
+}
+
+function WebhookPayloadPreview() {
+  const [show, setShow] = useState(false)
+  return (
+    <div style={{ marginTop: 2 }}>
+      <button
+        onClick={() => setShow(s => !s)}
+        style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: '#555', fontSize: 11, cursor: 'pointer', padding: 0 }}
+      >
+        <Info size={11} /> Example payload {show ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+      </button>
+      {show && (
+        <div style={{ marginTop: 6, background: '#0d0d0d', border: '1px solid #1e1e1e', borderRadius: 6, padding: '10px 12px' }}>
+          <div style={{ fontSize: 10, color: '#555', marginBottom: 6 }}>
+            POST <code style={{ color: '#888' }}>application/json</code> — sent on every status change
+          </div>
+          <pre style={{ margin: 0, fontSize: 11, color: '#a0aec0', lineHeight: 1.6, overflowX: 'auto' }}>
+            {JSON.stringify(WEBHOOK_PAYLOAD_DOWN, null, 2)}
+          </pre>
+          <div style={{ marginTop: 8, fontSize: 10, color: '#555' }}>
+            <code style={{ color: '#e53e3e' }}>event</code> is <code style={{ color: '#68d391' }}>"down"</code> or <code style={{ color: '#68d391' }}>"recovery"</code> — use it to branch your handler logic.
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── WebhookChannelForm ────────────────────────────────────────────────────────
 
 interface WebhookFormProps {
@@ -265,6 +305,7 @@ function WebhookChannelForm(props: WebhookFormProps) {
           <label style={labelStyle}>{props.urlLabel}</label>
           <input style={inputStyle} value={url} onChange={e => setUrl(e.target.value)} placeholder={props.urlPlaceholder} />
           {props.urlHint && <div style={{ fontSize: 11, color: '#555', marginTop: 5 }}>{props.urlHint}</div>}
+          {props.chType === 'webhook' && <div style={{ marginTop: 8 }}><WebhookPayloadPreview /></div>}
         </div>
 
         {/* Down message */}

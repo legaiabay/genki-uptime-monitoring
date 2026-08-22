@@ -391,13 +391,14 @@ function DonutChart({ up, degraded, down, total, size = 112, strokeWidth = 10 }:
   const r = half - strokeWidth - 2
   const cx = half, cy = half
   const circumference = 2 * Math.PI * r
-  const gap = 2
   const safeTotal = total || 1
   const segments = [
     { value: up,       color: '#48bb78' },
     { value: degraded, color: '#ed8936' },
     { value: down,     color: '#e53e3e' },
   ]
+  const activeSegments = segments.filter(s => s.value > 0)
+  const gap = activeSegments.length > 1 ? 2 : 0
   let offset = 0
   const arcs = segments.map(seg => {
     const dash = Math.max(0, (seg.value / safeTotal) * circumference - gap)

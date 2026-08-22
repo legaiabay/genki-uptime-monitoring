@@ -3,28 +3,39 @@ import { useNavigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
 import logo from '@/assets/logo.png'
 
-export default function Login() {
+export default function Setup() {
   const navigate = useNavigate()
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    setLoading(true)
 
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters')
+      return
+    }
+
+    setLoading(true)
     try {
-      const res = await fetch('/api/v1/auth/login', {
+      const res = await fetch('/api/v1/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ name, email, password }),
       })
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.message || 'Login failed')
+        setError(data.message || 'Setup failed')
         return
       }
 
@@ -37,9 +48,22 @@ export default function Login() {
     }
   }
 
+  const inputStyle = {
+    width: '100%',
+    background: '#111',
+    border: '1px solid #2a2a2a',
+    borderRadius: 8,
+    padding: '10px 14px',
+    fontSize: 13,
+    color: '#e8e8e8',
+    outline: 'none',
+    transition: 'border-color 0.2s',
+    boxSizing: 'border-box' as const,
+  }
+
   return (
     <div style={{
-      minHeight: '90vh',
+      minHeight: '100vh',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -60,7 +84,7 @@ export default function Login() {
         pointerEvents: 'none',
       }} />
 
-      <div style={{ width: '100%', maxWidth: 400, padding: '0 20px', position: 'relative', zIndex: 1 }}>
+      <div style={{ width: '100%', maxWidth: 420, padding: '0 20px', position: 'relative', zIndex: 1 }}>
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 32 }}>
           <img src={logo} alt="Genki" style={{ height: 200 }} />
@@ -74,8 +98,8 @@ export default function Login() {
           padding: '32px 28px',
           boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
         }}>
-          <h2 style={{ fontSize: 18, fontWeight: 600, color: '#e8e8e8', marginBottom: 4 }}>Welcome back</h2>
-          <p style={{ fontSize: 13, color: '#555', marginBottom: 24 }}>Sign in to your monitoring dashboard</p>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: '#e8e8e8', marginBottom: 4 }}>Welcome to Genki</h2>
+          <p style={{ fontSize: 13, color: '#555', marginBottom: 24 }}>Create your admin account to get started</p>
 
           {error && (
             <div style={{
@@ -94,6 +118,22 @@ export default function Login() {
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', fontSize: 12, color: '#888', marginBottom: 6, fontWeight: 500 }}>
+                Full Name
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your name"
+                required
+                style={inputStyle}
+                onFocus={e => e.target.style.borderColor = '#e53e3e'}
+                onBlur={e => e.target.style.borderColor = '#2a2a2a'}
+              />
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 12, color: '#888', marginBottom: 6, fontWeight: 500 }}>
                 Email
               </label>
               <input
@@ -102,23 +142,13 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 required
-                style={{
-                  width: '100%',
-                  background: '#111',
-                  border: '1px solid #2a2a2a',
-                  borderRadius: 8,
-                  padding: '10px 14px',
-                  fontSize: 13,
-                  color: '#e8e8e8',
-                  outline: 'none',
-                  transition: 'border-color 0.2s',
-                }}
+                style={inputStyle}
                 onFocus={e => e.target.style.borderColor = '#e53e3e'}
                 onBlur={e => e.target.style.borderColor = '#2a2a2a'}
               />
             </div>
 
-            <div style={{ marginBottom: 8 }}>
+            <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', fontSize: 12, color: '#888', marginBottom: 6, fontWeight: 500 }}>
                 Password
               </label>
@@ -126,28 +156,28 @@ export default function Login() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="Min. 8 characters"
                 required
-                style={{
-                  width: '100%',
-                  background: '#111',
-                  border: '1px solid #2a2a2a',
-                  borderRadius: 8,
-                  padding: '10px 14px',
-                  fontSize: 13,
-                  color: '#e8e8e8',
-                  outline: 'none',
-                  transition: 'border-color 0.2s',
-                }}
+                style={inputStyle}
                 onFocus={e => e.target.style.borderColor = '#e53e3e'}
                 onBlur={e => e.target.style.borderColor = '#2a2a2a'}
               />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
-              <a href="#" style={{ fontSize: 12, color: '#e53e3e', textDecoration: 'none' }}>
-                Forgot password?
-              </a>
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ display: 'block', fontSize: 12, color: '#888', marginBottom: 6, fontWeight: 500 }}>
+                Confirm Password
+              </label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                style={inputStyle}
+                onFocus={e => e.target.style.borderColor = '#e53e3e'}
+                onBlur={e => e.target.style.borderColor = '#2a2a2a'}
+              />
             </div>
 
             <button
@@ -167,15 +197,14 @@ export default function Login() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
-                transition: 'background 0.2s, transform 0.1s',
+                transition: 'background 0.2s',
               }}
             >
               {loading && <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />}
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? 'Creating account...' : 'Create admin account'}
             </button>
           </form>
         </div>
-
       </div>
     </div>
   )

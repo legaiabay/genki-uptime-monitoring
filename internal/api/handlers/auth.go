@@ -44,6 +44,15 @@ type userPayload struct {
 	Role  string `json:"role"`
 }
 
+func (h *AuthHandler) NeedsSetup(c echo.Context) error {
+	var count int
+	err := h.db.GetContext(c.Request().Context(), &count, `SELECT COUNT(*) FROM users`)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "database error")
+	}
+	return c.JSON(http.StatusOK, map[string]bool{"needs_setup": count == 0})
+}
+
 func (h *AuthHandler) Login(c echo.Context) error {
 	var req loginRequest
 	if err := c.Bind(&req); err != nil {
@@ -95,6 +104,13 @@ func (h *AuthHandler) Register(c echo.Context) error {
 	var req registerRequest
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+
+	// Only allow registration when no users exist (first-run setup)
+	var userCount int
+	_ = h.db.GetContext(c.Request().Context(), &userCount, `SELECT COUNT(*) FROM users`)
+	if userCount > 0 {
+		return echo.NewHTTPError(http.StatusForbidden, "registration is disabled after initial setup")
 	}
 
 	req.Name = strings.TrimSpace(req.Name)

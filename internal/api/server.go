@@ -41,10 +41,11 @@ func (s *Server) registerRoutes() {
 	authHandler := handlers.NewAuthHandler(s.db, s.cfg)
 	api.POST("/auth/login", authHandler.Login)
 	api.POST("/auth/register", authHandler.Register)
+	api.GET("/auth/needs-setup", authHandler.NeedsSetup)
 
-	// Protected routes
+	// Protected routes — accepts JWT or "gk_…" API keys
 	protected := api.Group("")
-	protected.Use(middleware.JWT(s.cfg.JWTSecret))
+	protected.Use(middleware.JWT(s.cfg.JWTSecret, s.db))
 
 	// Profile
 	profileHandler := handlers.NewProfileHandler(s.db)
@@ -89,6 +90,12 @@ func (s *Server) registerRoutes() {
 	protected.POST("/notifications", notifHandler.Upsert)
 	protected.DELETE("/notifications/:id", notifHandler.Delete)
 	protected.PATCH("/notifications/:id/enabled", notifHandler.SetEnabled)
+
+	// API Keys
+	apiKeyHandler := handlers.NewAPIKeyHandler(s.db)
+	protected.GET("/api-keys", apiKeyHandler.List)
+	protected.POST("/api-keys", apiKeyHandler.Create)
+	protected.DELETE("/api-keys/:id", apiKeyHandler.Delete)
 
 	// Dashboard stats
 	statsHandler := handlers.NewStatsHandler(s.db)

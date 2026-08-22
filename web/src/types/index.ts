@@ -60,6 +60,17 @@ export interface OverviewStats {
   incident_count: number
 }
 
+export interface ApiKey {
+  id: number
+  user_id: number
+  name: string
+  key_prefix: string   // masked — only first 10 chars + "…" (list endpoint)
+  key?: string         // full key — only present in the create response
+  last_used: string | null
+  expires_at: string | null
+  created_at: string
+}
+
 export interface ApiResponse<T> {
   data: T
   message?: string
