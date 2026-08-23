@@ -1264,7 +1264,6 @@ export default function Settings() {
           {tabs.map((tab, idx) => {
             const Icon = tab.icon
             const active = activeTab === tab.value
-            const isFirst = idx === 0
             const prevDanger = idx > 0 && tabs[idx - 1].danger
             const showSeparator = tab.danger && !prevDanger
             return (
