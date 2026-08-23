@@ -14,14 +14,15 @@
 
 ---
 
-Genki monitors your HTTP endpoints, TCP ports, and services on a configurable schedule, tracks incidents, fires notifications to Slack/Telegram/Google Chat, and serves a public status page — all from a single Docker image.
+Genki monitors your HTTP endpoints, TCP ports, and services on a configurable schedule, tracks incidents, fires notifications to Slack/Telegram/Google Chat, and serves public status pages — all from a single Docker image.
 
 ## Features
 
 - **Monitor types** — HTTP, TCP, ping with configurable intervals and timeouts
+- **Groups & labels** — organise monitors into groups with colour-coded labels; filter and search by group or label across the dashboard
+- **Multiple public status pages** — each group gets its own public page at `/status/group/<slug>`; the main `/status` page aggregates all public monitors
 - **Incident tracking** — automatic open/resolve lifecycle with manual override
 - **Notifications** — Slack, Telegram, Google Chat, generic webhook with separate down/recovery templates
-- **Public status page** — per-monitor visibility toggle, no login required
 - **Heartbeat monitoring** — passive checks; alert when your service stops pinging in
 - **Uptime charts** — time-series sparklines at 1h / 6h / 24h / 7d / 30d resolution
 - **API keys** — generate `gk_…` tokens for programmatic access
@@ -49,24 +50,35 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Open `http://localhost:8080`. On first run, Genki detects there are no users and redirects to `/setup` where you create your admin account (name, email, password). After submitting, you're logged in automatically.
+Open `http://localhost:8080`. On first run, Genki detects there are no users and redirects to `/setup` where you create your admin account. After submitting, you're logged in automatically.
 
 > The setup screen is only available on first run. Once an admin account exists, it redirects to `/login`.
 
 ### Local Development
 
 ```bash
-make dev-db              # start local PostgreSQL
-cp .env.example .env     # configure backend environment
-cp web/.env.example web/.env  # configure frontend dev proxy
+make dev-db                           # start local PostgreSQL
+cp .env.example .env                  # configure backend
+cp web/.env.example web/.env          # configure frontend dev proxy
 
-air                      # Go backend with live reload (separate terminal)
-cd web && npm install && npm run dev  # frontend dev server
+air                                   # Go backend with live reload
+cd web && npm install && npm run dev  # frontend dev server (separate terminal)
 ```
 
-Open `http://localhost:5173`. On first run you'll be redirected to `/setup` to create your admin account, same as above.
+Open `http://localhost:5173`. On first run you'll be redirected to `/setup`.
 
 See [docs/development.md](docs/development.md) for the full local setup guide.
+
+## Groups & Labels
+
+Monitors can be assigned a **group** and any number of **labels**.
+
+- Set group and labels when creating or editing a monitor in the Add/Edit Monitor modal
+- **Grouped view** on the Monitors page collapses monitors by group with a collapsible section per group; switch to flat view anytime
+- **Sidebar filters** let you click any group or label to filter the list instantly
+- **Search** matches name, URL, group name, and labels simultaneously
+- Each group with public monitors automatically gets its own status page at `/status/group/<group-slug>` (e.g. `Production` → `/status/group/production`)
+- The main `/status` page shows all public monitors grouped by group with nav pills to each group page
 
 ## Configuration
 

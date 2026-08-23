@@ -10,6 +10,7 @@ import Notifications from '@/pages/Notifications'
 import Login from '@/pages/Login'
 import Setup from '@/pages/Setup'
 import PublicStatus from '@/pages/PublicStatus'
+import GroupPublicStatus from '@/pages/GroupPublicStatus'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -68,6 +69,7 @@ function AppRoutes() {
         <Route path="/login"  element={<Login />} />
         <Route path="/setup"  element={<Setup />} />
         <Route path="/status" element={<PublicStatus />} />
+        <Route path="/status/group/:groupSlug" element={<GroupPublicStatus />} />
         <Route path="/" element={<Layout />}>
           <Route index element={<Navigate to="/overview" replace />} />
           <Route path="overview"      element={<Overview />} />

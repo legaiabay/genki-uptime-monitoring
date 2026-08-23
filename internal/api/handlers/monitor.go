@@ -10,6 +10,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
+	"github.com/lib/pq"
 )
 
 type MonitorHandler struct {
@@ -22,36 +23,40 @@ func NewMonitorHandler(db *sqlx.DB) *MonitorHandler {
 
 const monitorCols = `id, name, url, type, interval, timeout, status, active,
 	expected_status, max_retries, uptime_percentage,
-	public, public_slug, last_checked_at, created_at, updated_at`
+	public, public_slug, group_name, labels, last_checked_at, created_at, updated_at`
 
 type monitorRow struct {
-	ID               int64      `db:"id" json:"id"`
-	Name             string     `db:"name" json:"name"`
-	URL              string     `db:"url" json:"url"`
-	Type             string     `db:"type" json:"type"`
-	Interval         int        `db:"interval" json:"interval"`
-	Timeout          int        `db:"timeout" json:"timeout"`
-	Status           string     `db:"status" json:"status"`
-	Active           bool       `db:"active" json:"active"`
-	ExpectedStatus   int        `db:"expected_status" json:"expected_status"`
-	MaxRetries       int        `db:"max_retries" json:"max_retries"`
-	UptimePercentage float64    `db:"uptime_percentage" json:"uptime_percentage"`
-	Public           bool       `db:"public" json:"public"`
-	PublicSlug       *string    `db:"public_slug" json:"public_slug"`
-	LastCheckedAt    *time.Time `db:"last_checked_at" json:"last_checked_at"`
-	CreatedAt        time.Time  `db:"created_at" json:"created_at"`
-	UpdatedAt        time.Time  `db:"updated_at" json:"updated_at"`
-	LastResponseTime *int       `db:"last_response_time" json:"last_response_time"`
+	ID               int64          `db:"id" json:"id"`
+	Name             string         `db:"name" json:"name"`
+	URL              string         `db:"url" json:"url"`
+	Type             string         `db:"type" json:"type"`
+	Interval         int            `db:"interval" json:"interval"`
+	Timeout          int            `db:"timeout" json:"timeout"`
+	Status           string         `db:"status" json:"status"`
+	Active           bool           `db:"active" json:"active"`
+	ExpectedStatus   int            `db:"expected_status" json:"expected_status"`
+	MaxRetries       int            `db:"max_retries" json:"max_retries"`
+	UptimePercentage float64        `db:"uptime_percentage" json:"uptime_percentage"`
+	Public           bool           `db:"public" json:"public"`
+	PublicSlug       *string        `db:"public_slug" json:"public_slug"`
+	GroupName        string         `db:"group_name" json:"group_name"`
+	Labels           pq.StringArray `db:"labels" json:"labels"`
+	LastCheckedAt    *time.Time     `db:"last_checked_at" json:"last_checked_at"`
+	CreatedAt        time.Time      `db:"created_at" json:"created_at"`
+	UpdatedAt        time.Time      `db:"updated_at" json:"updated_at"`
+	LastResponseTime *int           `db:"last_response_time" json:"last_response_time"`
 }
 
 type createMonitorRequest struct {
-	Name           string `json:"name"`
-	URL            string `json:"url"`
-	Type           string `json:"type"`
-	Interval       int    `json:"interval"`
-	Timeout        int    `json:"timeout"`
-	ExpectedStatus int    `json:"expected_status"`
-	MaxRetries     int    `json:"max_retries"`
+	Name           string   `json:"name"`
+	URL            string   `json:"url"`
+	Type           string   `json:"type"`
+	Interval       int      `json:"interval"`
+	Timeout        int      `json:"timeout"`
+	ExpectedStatus int      `json:"expected_status"`
+	MaxRetries     int      `json:"max_retries"`
+	GroupName      string   `json:"group_name"`
+	Labels         []string `json:"labels"`
 }
 
 func (h *MonitorHandler) List(c echo.Context) error {
@@ -59,10 +64,11 @@ func (h *MonitorHandler) List(c echo.Context) error {
 	err := h.db.SelectContext(c.Request().Context(), &monitors,
 		`SELECT m.id, m.name, m.url, m.type, m.interval, m.timeout, m.status, m.active,
 		        m.expected_status, m.max_retries, m.uptime_percentage,
-		        m.public, m.public_slug, m.last_checked_at, m.created_at, m.updated_at,
+		        m.public, m.public_slug, m.group_name, m.labels,
+		        m.last_checked_at, m.created_at, m.updated_at,
 		        (SELECT l.response_time FROM monitor_logs l
 		         WHERE l.monitor_id = m.id ORDER BY l.checked_at DESC LIMIT 1) AS last_response_time
-		 FROM monitors m ORDER BY m.created_at DESC`)
+		 FROM monitors m ORDER BY m.group_name ASC, m.created_at DESC`)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to fetch monitors")
 	}
@@ -70,6 +76,19 @@ func (h *MonitorHandler) List(c echo.Context) error {
 		monitors = []monitorRow{}
 	}
 	return c.JSON(http.StatusOK, echo.Map{"data": monitors})
+}
+
+func (h *MonitorHandler) ListGroups(c echo.Context) error {
+	var groups []string
+	err := h.db.SelectContext(c.Request().Context(), &groups,
+		`SELECT DISTINCT group_name FROM monitors WHERE group_name <> '' ORDER BY group_name ASC`)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to fetch groups")
+	}
+	if groups == nil {
+		groups = []string{}
+	}
+	return c.JSON(http.StatusOK, echo.Map{"data": groups})
 }
 
 func (h *MonitorHandler) Create(c echo.Context) error {
@@ -80,6 +99,7 @@ func (h *MonitorHandler) Create(c echo.Context) error {
 
 	req.Name = strings.TrimSpace(req.Name)
 	req.URL = strings.TrimSpace(req.URL)
+	req.GroupName = strings.TrimSpace(req.GroupName)
 	if req.Name == "" || req.URL == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "name and url are required")
 	}
@@ -98,13 +118,17 @@ func (h *MonitorHandler) Create(c echo.Context) error {
 	if req.MaxRetries <= 0 {
 		req.MaxRetries = 1
 	}
+	if req.Labels == nil {
+		req.Labels = []string{}
+	}
 
 	var monitor monitorRow
 	err := h.db.QueryRowxContext(c.Request().Context(),
-		`INSERT INTO monitors (name, url, type, interval, timeout, expected_status, max_retries)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`INSERT INTO monitors (name, url, type, interval, timeout, expected_status, max_retries, group_name, labels)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		 RETURNING `+monitorCols,
 		req.Name, req.URL, req.Type, req.Interval, req.Timeout, req.ExpectedStatus, req.MaxRetries,
+		req.GroupName, pq.Array(req.Labels),
 	).StructScan(&monitor)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create monitor")
@@ -143,6 +167,10 @@ func (h *MonitorHandler) Update(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
+	if req.Labels == nil {
+		req.Labels = []string{}
+	}
+
 	var monitor monitorRow
 	err = h.db.QueryRowxContext(c.Request().Context(),
 		`UPDATE monitors
@@ -153,10 +181,13 @@ func (h *MonitorHandler) Update(c echo.Context) error {
 		     timeout = CASE WHEN $5 > 0 THEN $5 ELSE timeout END,
 		     expected_status = CASE WHEN $6 > 0 THEN $6 ELSE expected_status END,
 		     max_retries = CASE WHEN $7 > 0 THEN $7 ELSE max_retries END,
+		     group_name = $8,
+		     labels = $9,
 		     updated_at = NOW()
-		 WHERE id = $8
+		 WHERE id = $10
 		 RETURNING `+monitorCols,
-		req.Name, req.URL, req.Type, req.Interval, req.Timeout, req.ExpectedStatus, req.MaxRetries, id,
+		req.Name, req.URL, req.Type, req.Interval, req.Timeout, req.ExpectedStatus, req.MaxRetries,
+		strings.TrimSpace(req.GroupName), pq.Array(req.Labels), id,
 	).StructScan(&monitor)
 	if err != nil {
 		if err == sql.ErrNoRows {

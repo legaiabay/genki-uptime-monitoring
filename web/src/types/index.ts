@@ -16,6 +16,8 @@ export interface Monitor {
   uptime_percentage: number
   public: boolean
   public_slug: string | null
+  group_name: string
+  labels: string[]
   last_checked_at: string | null
   last_response_time: number | null
   created_at: string

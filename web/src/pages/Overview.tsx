@@ -5,7 +5,7 @@ import {
 } from 'recharts'
 import {
   Heart, Clock, AlertTriangle,
-  RotateCcw, Plus, MoreVertical, ChevronDown,
+  RotateCcw, Plus, MoreVertical, ChevronDown, Search, X, Layers,
 } from 'lucide-react'
 import Card from '@/components/ui/Card'
 import StatusBadge from '@/components/ui/StatusBadge'
@@ -16,6 +16,7 @@ import { useOverviewStats } from '@/hooks/useOverviewStats'
 import { useMonitors } from '@/hooks/useMonitors'
 import { useIncidents } from '@/hooks/useIncidents'
 import { useUptimeSeries } from '@/hooks/useUptimeSeries'
+import { useAppSettings, useUpdateAppSettings } from '@/hooks/useProfile'
 import type { MonitorStatus } from '@/types'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -33,7 +34,32 @@ const incidentStatusStyle: Record<string, { color: string; bg: string }> = {
   resolved:      { color: '#68d391', bg: 'rgba(104,211,145,0.12)' },
 }
 
-// Fixed palette for per-monitor lines (assigned server-side)
+const LABEL_COLORS = [
+  '#4299e1', '#48bb78', '#ed8936', '#9f7aea',
+  '#f6ad55', '#fc8181', '#68d391', '#76e4f7',
+]
+
+function labelColor(label: string) {
+  let hash = 0
+  for (let i = 0; i < label.length; i++) hash = label.charCodeAt(i) + ((hash << 5) - hash)
+  return LABEL_COLORS[Math.abs(hash) % LABEL_COLORS.length]
+}
+
+function LabelChip({ label }: { label: string }) {
+  const color = labelColor(label)
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center',
+      fontSize: 10, fontWeight: 500,
+      padding: '1px 6px', borderRadius: 8,
+      background: `${color}18`, color,
+      border: `1px solid ${color}40`,
+      whiteSpace: 'nowrap',
+    }}>
+      {label}
+    </span>
+  )
+}
 
 const TIME_RANGES = [
   { label: 'Last 1 hour',   value: '1h'  },
@@ -74,6 +100,9 @@ export default function Overview() {
   const navigate = useNavigate()
   const [timeRange, setTimeRange] = useState('24h')
   const [showTimeDropdown, setShowTimeDropdown] = useState(false)
+  const [showIntervalDropdown, setShowIntervalDropdown] = useState(false)
+  const [search, setSearch] = useState('')
+  const [groupFilter, setGroupFilter] = useState<string | null>(null)
 
   const selectedRange = TIME_RANGES.find(r => r.value === timeRange) ?? TIME_RANGES[2]
 
@@ -81,6 +110,8 @@ export default function Overview() {
   const { data: monitors = [], isFetching: monitorsFetching, refetch: refetchMonitors } = useMonitors()
   const { data: incidents = [] } = useIncidents()
   const { data: series } = useUptimeSeries(timeRange)
+  const { data: appSettings } = useAppSettings()
+  const updateAppSettings = useUpdateAppSettings()
 
   const isFetching = statsFetching || monitorsFetching
 
@@ -92,6 +123,22 @@ export default function Overview() {
   const allBars = monitors.flatMap(m =>
     Array(5).fill(m.status === 'pending' ? 'up' : m.status)
   ) as Array<'up' | 'down' | 'degraded'>
+
+  // Collect unique groups for quick filter
+  const allGroups = Array.from(new Set(monitors.map(m => m.group_name).filter(Boolean))).sort()
+
+  // Filter monitors for the status table
+  const filteredMonitors = monitors.filter(m => {
+    const q = search.toLowerCase()
+    const matchSearch = !q || (
+      m.name.toLowerCase().includes(q) ||
+      m.url.toLowerCase().includes(q) ||
+      m.group_name.toLowerCase().includes(q) ||
+      m.labels.some(l => l.toLowerCase().includes(q))
+    )
+    const matchGroup = groupFilter === null || m.group_name === groupFilter
+    return matchSearch && matchGroup
+  })
 
   // Build uptime chart from time-series API
   const activeMonitors = monitors.filter(m => m.active)
@@ -132,6 +179,44 @@ export default function Overview() {
           <p style={{ fontSize: 12, color: '#555' }}>System health at a glance</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {appSettings?.default_interval && (() => {
+            const secs = parseInt(appSettings.default_interval, 10)
+            const intervalLabel = secs >= 60 ? `${secs / 60}m` : `${secs}s`
+            const INTERVAL_OPTIONS = [
+              { label: '30 seconds', value: '30' },
+              { label: '1 minute',   value: '60' },
+              { label: '2 minutes',  value: '120' },
+              { label: '5 minutes',  value: '300' },
+              { label: '10 minutes', value: '600' },
+              { label: '30 minutes', value: '1800' },
+            ]
+            return (
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowIntervalDropdown(o => !o)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 6, color: '#888', fontSize: 12, padding: '6px 12px', cursor: 'pointer' }}
+                >
+                  <Clock size={13} />Check interval: <span style={{ color: '#e8e8e8', fontWeight: 500 }}>{intervalLabel}</span><ChevronDown size={12} />
+                </button>
+                {showIntervalDropdown && (
+                  <>
+                    <div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={() => setShowIntervalDropdown(false)} />
+                    <div style={{ position: 'absolute', top: 34, right: 0, zIndex: 10, background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 6, minWidth: 160, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                      {INTERVAL_OPTIONS.map(opt => (
+                        <button key={opt.value}
+                          onClick={() => {
+                            updateAppSettings.mutate({ default_interval: opt.value })
+                            setShowIntervalDropdown(false)
+                          }}
+                          style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 14px', background: opt.value === appSettings.default_interval ? '#2a2a2a' : 'none', border: 'none', color: opt.value === appSettings.default_interval ? '#e8e8e8' : '#888', fontSize: 12, cursor: 'pointer' }}
+                        >{opt.label}</button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )
+          })()}
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setShowTimeDropdown(o => !o)}
@@ -283,8 +368,8 @@ export default function Overview() {
         />
       </div>
 
-      {/* main content — full width (no right column) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* main content — monitors + incidents side by side */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16, alignItems: 'start' }}>
 
         {/* Monitors table */}
         <Card>
@@ -292,6 +377,61 @@ export default function Overview() {
             <span style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8' }}>Monitors Status</span>
             <button onClick={() => navigate('/monitors')} style={{ background: 'none', border: 'none', color: '#666', fontSize: 12, cursor: 'pointer' }}>View all</button>
           </div>
+
+          {/* search + group filter */}
+          <div style={{ display: 'flex', gap: 8, padding: '0 16px 10px', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: 180 }}>
+              <Search size={12} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#555' }} />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search monitors…"
+                style={{
+                  width: '100%', background: '#161616', border: '1px solid #2a2a2a',
+                  borderRadius: 6, color: '#e8e8e8', fontSize: 12,
+                  padding: '5px 28px 5px 26px', outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+              {search && (
+                <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#555', padding: 0, display: 'flex' }}>
+                  <X size={11} />
+                </button>
+              )}
+            </div>
+            {allGroups.length > 0 && (
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => setGroupFilter(null)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    padding: '4px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer',
+                    border: groupFilter === null ? '1px solid #3a3a3a' : '1px solid transparent',
+                    background: groupFilter === null ? '#252525' : 'transparent',
+                    color: groupFilter === null ? '#e8e8e8' : '#666',
+                  }}
+                >
+                  All
+                </button>
+                {allGroups.map(g => (
+                  <button
+                    key={g}
+                    onClick={() => setGroupFilter(gf => gf === g ? null : g)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      padding: '4px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer',
+                      border: groupFilter === g ? '1px solid #3a3a3a' : '1px solid transparent',
+                      background: groupFilter === g ? '#252525' : 'transparent',
+                      color: groupFilter === g ? '#e8e8e8' : '#666',
+                    }}
+                  >
+                    <Layers size={10} color={groupFilter === g ? '#e53e3e' : '#444'} />
+                    {g}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
@@ -301,13 +441,21 @@ export default function Overview() {
               </tr>
             </thead>
             <tbody>
-              {monitors.slice(0, 6).map((m, idx) => {
+              {filteredMonitors.slice(0, 8).map((m, idx) => {
                 const bars = Array(14).fill(m.status === 'pending' ? 'up' : m.status) as MonitorStatus[]
                 return (
-                  <tr key={m.id} style={{ borderBottom: idx < 5 ? '1px solid #1e1e1e' : 'none' }}>
+                  <tr key={m.id} style={{ borderBottom: idx < Math.min(filteredMonitors.length, 8) - 1 ? '1px solid #1e1e1e' : 'none' }}>
                     <td style={{ padding: '10px 16px' }}>
                       <div style={{ fontSize: 13, color: '#e8e8e8', fontWeight: 500 }}>{m.name}</div>
                       <div style={{ fontSize: 11, color: '#555', marginTop: 1 }}>{m.url}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                        {m.group_name && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#666', background: '#1e1e1e', padding: '1px 6px', borderRadius: 8, border: '1px solid #2a2a2a' }}>
+                            <Layers size={9} color="#555" />{m.group_name}
+                          </span>
+                        )}
+                        {m.labels.map(l => <LabelChip key={l} label={l} />)}
+                      </div>
                     </td>
                     <td style={{ padding: '10px 16px' }}>
                       <StatusBadge status={m.status} />
@@ -335,12 +483,19 @@ export default function Overview() {
                   </tr>
                 )
               })}
+              {filteredMonitors.length === 0 && (
+                <tr>
+                  <td colSpan={7} style={{ padding: '24px 16px', textAlign: 'center', color: '#555', fontSize: 12 }}>
+                    No monitors match your search
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
-          {monitors.length > 6 && (
+          {(monitors.length > 8 || filteredMonitors.length > 8) && (
             <div style={{ padding: '10px 16px', borderTop: '1px solid #1e1e1e', display: 'flex', justifyContent: 'center' }}>
               <button onClick={() => navigate('/monitors')} style={{ background: 'none', border: 'none', color: '#666', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                Load more <ChevronDown size={12} />
+                View all monitors <ChevronDown size={12} />
               </button>
             </div>
           )}

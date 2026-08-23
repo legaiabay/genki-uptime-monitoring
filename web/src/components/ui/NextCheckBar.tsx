@@ -29,8 +29,8 @@ export default function NextCheckBar({ lastCheckedAt, intervalSeconds }: Props) 
   }, [lastCheckedAt, intervalSeconds])
 
   const label = secondsLeft <= 0 ? 'Checking…' : `Next check in ${secondsLeft}s`
-  const barColor = secondsLeft <= 0 ? '#e53e3e' : '#333'
-  const fillColor = secondsLeft <= 0 ? '#e53e3e' : '#48bb78'
+  const barColor = secondsLeft <= 0 ? '#3d3300' : '#333'
+  const fillColor = secondsLeft <= 0 ? '#ecc94b' : '#48bb78'
 
   return (
     <div style={{ minWidth: 110 }}>
@@ -46,7 +46,7 @@ export default function NextCheckBar({ lastCheckedAt, intervalSeconds }: Props) 
           borderRadius: 2,
         }} />
       </div>
-      <div style={{ fontSize: 10, color: secondsLeft <= 0 ? '#fc8181' : '#444', whiteSpace: 'nowrap' }}>
+      <div style={{ fontSize: 10, color: secondsLeft <= 0 ? '#ecc94b' : '#444', whiteSpace: 'nowrap' }}>
         {lastCheckedAt ? label : '—'}
       </div>
     </div>

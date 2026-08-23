@@ -10,6 +10,8 @@ export interface CreateMonitorPayload {
   timeout: number
   expected_status: number
   max_retries: number
+  group_name: string
+  labels: string[]
 }
 
 async function fetchMonitors(): Promise<Monitor[]> {
@@ -19,6 +21,11 @@ async function fetchMonitors(): Promise<Monitor[]> {
 
 async function fetchMonitor(id: number): Promise<Monitor> {
   const res = await api.get<{ data: Monitor }>(`/monitors/${id}`)
+  return res.data.data
+}
+
+async function fetchGroups(): Promise<string[]> {
+  const res = await api.get<{ data: string[] }>('/monitors/groups')
   return res.data.data
 }
 
@@ -52,11 +59,22 @@ export function useMonitor(id: number) {
   })
 }
 
+export function useGroups() {
+  return useQuery<string[]>({
+    queryKey: ['monitor-groups'],
+    queryFn: fetchGroups,
+    staleTime: 60_000,
+  })
+}
+
 export function useCreateMonitor() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: createMonitor,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['monitors'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['monitors'] })
+      qc.invalidateQueries({ queryKey: ['monitor-groups'] })
+    },
   })
 }
 
@@ -65,7 +83,10 @@ export function useUpdateMonitor() {
   return useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: Partial<CreateMonitorPayload> }) =>
       updateMonitor(id, payload),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['monitors'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['monitors'] })
+      qc.invalidateQueries({ queryKey: ['monitor-groups'] })
+    },
   })
 }
 
@@ -73,7 +94,10 @@ export function useDeleteMonitor() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: deleteMonitor,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['monitors'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['monitors'] })
+      qc.invalidateQueries({ queryKey: ['monitor-groups'] })
+    },
   })
 }
 

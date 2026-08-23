@@ -33,10 +33,6 @@ r = requests.get(
 monitors = r.json()['data']
 ```
 
-## API Collections
-
-Downloadable Postman (v2.1) and Bruno collections are available directly from **Settings → API Keys**, pre-configured with all endpoints and a bundled environment. Replace the `apiKey` variable in the environment with your generated key.
-
 ## Revoking a Key
 
 Click the trash icon next to the key in **Settings → API Keys**. Revoked keys are rejected immediately.
@@ -54,20 +50,37 @@ All protected routes accept `Authorization: Bearer <jwt-or-api-key>`.
 | `POST` | `/auth/login` | Login, returns JWT + user |
 | `POST` | `/auth/register` | Register the first user |
 | `POST` | `/heartbeats/:slug` | Push a heartbeat ping |
-| `GET` | `/public/status` | All public monitors + logs |
-| `GET` | `/public/status/:slug` | Single public monitor |
+| `GET` | `/public/status` | All public monitors + logs (grouped) |
+| `GET` | `/public/status/:slug` | Single public monitor by slug |
+| `GET` | `/public/status/group/:groupSlug` | All public monitors in a group |
+| `GET` | `/public/groups` | List groups that have public monitors |
 
 ### Monitors
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/monitors` | List all monitors |
+| `GET` | `/monitors` | List all monitors (ordered by group, then created) |
 | `POST` | `/monitors` | Create a monitor |
 | `GET` | `/monitors/:id` | Get a single monitor |
 | `PUT` | `/monitors/:id` | Update a monitor |
 | `DELETE` | `/monitors/:id` | Delete a monitor |
 | `GET` | `/monitors/:id/logs` | Get check history |
 | `PATCH` | `/monitors/:id/visibility` | Toggle public flag |
+| `GET` | `/monitors/groups` | List distinct group names |
+
+#### Monitor fields
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | string | Display name |
+| `url` | string | Target URL or address |
+| `type` | `http` \| `tcp` \| `ping` | Protocol |
+| `interval` | int | Check interval in seconds |
+| `timeout` | int | Timeout in seconds |
+| `expected_status` | int | Expected HTTP status code |
+| `max_retries` | int | Retries before marking down |
+| `group_name` | string | Group this monitor belongs to (optional) |
+| `labels` | string[] | Array of short tags (optional) |
 
 ### Incidents
 

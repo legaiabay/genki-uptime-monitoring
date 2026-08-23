@@ -63,6 +63,7 @@ func (s *Server) registerRoutes() {
 	monitorHandler := handlers.NewMonitorHandler(s.db)
 	protected.GET("/monitors", monitorHandler.List)
 	protected.POST("/monitors", monitorHandler.Create)
+	protected.GET("/monitors/groups", monitorHandler.ListGroups)
 	protected.GET("/monitors/:id", monitorHandler.Get)
 	protected.PUT("/monitors/:id", monitorHandler.Update)
 	protected.DELETE("/monitors/:id", monitorHandler.Delete)
@@ -72,6 +73,8 @@ func (s *Server) registerRoutes() {
 	// Public status (no auth)
 	publicHandler := handlers.NewPublicHandler(s.db)
 	api.GET("/public/status", publicHandler.GetStatus)
+	api.GET("/public/groups", publicHandler.GetPublicGroups)
+	api.GET("/public/status/group/:groupSlug", publicHandler.GetGroupStatus)
 	api.GET("/public/status/:slug", publicHandler.GetMonitorStatus)
 
 	// Incidents

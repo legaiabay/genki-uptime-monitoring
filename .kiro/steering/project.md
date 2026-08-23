@@ -2,7 +2,7 @@
 
 ## Overview
 
-Genki is a self-hosted uptime and healthcheck monitoring application. It checks HTTP/TCP/ping endpoints on a configurable schedule, tracks incidents, sends notifications to multiple channels, and exposes a public status page. The entire application ships as a single Docker image.
+Genki is a self-hosted uptime and healthcheck monitoring application. It checks HTTP/TCP/ping endpoints on a configurable schedule, tracks incidents, sends notifications to multiple channels, and exposes public status pages. The entire application ships as a single Docker image.
 
 ---
 
@@ -19,7 +19,7 @@ Genki is a self-hosted uptime and healthcheck monitoring application. It checks 
 | `gorilla/websocket` | WebSocket for real-time UI updates |
 | `golang-jwt/jwt/v5` | JWT token generation and validation |
 | `joho/godotenv` | `.env` loading in development only |
-| `lib/pq` | PostgreSQL driver |
+| `lib/pq` | PostgreSQL driver — also provides `pq.StringArray` for `TEXT[]` columns |
 | `golang.org/x/crypto` | bcrypt password hashing |
 
 ### Frontend
@@ -61,13 +61,13 @@ genki-uptime-monitoring/
 │   │   ├── handlers/
 │   │   │   ├── apikey.go                # CRUD /api-keys + LookupAPIKey helper
 │   │   │   ├── auth.go                  # POST /auth/login, /auth/register
-│   │   │   ├── monitor.go               # CRUD + /logs + /visibility (PATCH)
+│   │   │   ├── monitor.go               # CRUD + /logs + /visibility + /groups
 │   │   │   ├── incident.go              # List/Get/Update incidents
 │   │   │   ├── heartbeat.go             # List + public Push endpoint
 │   │   │   ├── stats.go                 # GET /stats/overview
 │   │   │   ├── uptime_series.go         # GET /stats/uptime-series?range=
 │   │   │   ├── notification.go          # CRUD notification_channels
-│   │   │   ├── public.go                # GET /public/status (no auth)
+│   │   │   ├── public.go                # GET /public/status, /public/status/group/:slug, /public/groups
 │   │   │   ├── profile.go               # GET/PUT /profile, POST /profile/password
 │   │   │   ├── websocket.go             # WebSocket hub
 │   │   │   └── appsettings.go           # GET/PUT /settings/general
@@ -83,7 +83,8 @@ genki-uptime-monitoring/
 │   │       ├── 00003_notification_channels.sql # notification_channels table
 │   │       ├── 00004_fix_notification_unique.sql
 │   │       ├── 00005_app_settings.sql   # app_settings key-value table
-│   │       └── 00006_incidents_soft_fk.sql     # incidents.monitor_id SET NULL on delete
+│   │       ├── 00006_incidents_soft_fk.sql     # incidents.monitor_id SET NULL on delete
+│   │       └── 00007_monitor_groups_labels.sql # monitors.group_name + labels TEXT[]
 │   ├── models/                          # Plain Go structs matching DB schema
 │   ├── notifier/
 │   │   ├── notifier.go                  # Payload, Notifier interface, GoogleChat/Telegram/Slack/Webhook senders
@@ -92,20 +93,21 @@ genki-uptime-monitoring/
 ├── web/                                 # React + Vite frontend
 │   ├── .env                             # Frontend env (gitignored) — VITE_API_TARGET, VITE_WS_TARGET
 │   ├── .env.example                     # Template for web/.env
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── layout/                  # Sidebar, Layout
-│   │   │   └── ui/                      # Card, StatusBadge, MiniSparkline, UptimeBars, NextCheckBar
-│   │   ├── hooks/                       # useMonitors, useIncidents, useHeartbeats, useProfile,
-│   │   │                                # useNotifications, useUptimeSeries, useOverviewStats,
-│   │   │                                # usePublicStatus, useSiteTitle, useApiKeys
-│   │   ├── lib/api.ts                   # Axios instance with JWT interceptor + 401 redirect
-│   │   ├── pages/                       # Overview, Monitors, Incidents, Heartbeats,
-│   │   │                                # Notifications, Settings, Login, PublicStatus
-│   │   ├── store/                       # Zustand stores (UI state)
-│   │   ├── types/index.ts               # Shared TypeScript types (incl. ApiKey)
-│   │   └── App.tsx                      # QueryClient, BrowserRouter, routes
-│   └── package.json
+│   └── src/
+│       ├── components/
+│       │   ├── layout/                  # Sidebar, Layout
+│       │   └── ui/                      # Card, StatusBadge, MiniSparkline, UptimeBars, NextCheckBar
+│       ├── hooks/                       # useMonitors (+ useGroups), useIncidents, useHeartbeats,
+│       │   │                            # useProfile, useNotifications, useUptimeSeries,
+│       │   │                            # useOverviewStats, usePublicStatus (+ useGroupPublicStatus,
+│       │   │                            # usePublicGroups), useSiteTitle, useApiKeys
+│       ├── lib/api.ts                   # Axios instance with JWT interceptor + 401 redirect
+│       ├── pages/                       # Overview, Monitors, Incidents, Heartbeats,
+│       │   │                            # Notifications, Settings, Login, Setup,
+│       │   │                            # PublicStatus, GroupPublicStatus
+│       ├── store/                       # Zustand stores (UI state)
+│       ├── types/index.ts               # Shared TypeScript types (Monitor has group_name, labels)
+│       └── App.tsx                      # QueryClient, BrowserRouter, routes
 ├── docker-compose.yml                   # Production: app + postgres
 ├── docker-compose.dev.yml              # Development: postgres only
 ├── Dockerfile                           # 3-stage: frontend-builder → go-builder → alpine
@@ -124,8 +126,10 @@ genki-uptime-monitoring/
 | POST | `/api/v1/auth/login` | Login, returns JWT + user |
 | POST | `/api/v1/auth/register` | Register first user |
 | POST | `/api/v1/heartbeats/:slug` | Push heartbeat ping |
-| GET  | `/api/v1/public/status` | All public monitors + logs |
-| GET  | `/api/v1/public/status/:slug` | Single public monitor |
+| GET  | `/api/v1/public/status` | All public monitors + logs, grouped |
+| GET  | `/api/v1/public/status/:slug` | Single public monitor by slug |
+| GET  | `/api/v1/public/status/group/:groupSlug` | Public monitors for one group |
+| GET  | `/api/v1/public/groups` | Groups with public monitors + status summary |
 
 ### Protected (Bearer JWT or API key)
 
@@ -136,12 +140,14 @@ All protected endpoints accept `Authorization: Bearer <jwt>` **or** `Authorizati
 | GET/PUT | `/api/v1/profile` | Get/update user profile |
 | POST | `/api/v1/profile/password` | Change password |
 | GET/PUT | `/api/v1/settings/general` | App-wide settings (site_name, timezone, etc.) |
-| GET | `/api/v1/monitors` | List monitors (includes `last_response_time`) |
+| GET | `/api/v1/monitors` | List monitors (ordered by group_name, then created_at) |
 | POST | `/api/v1/monitors` | Create monitor |
+| GET | `/api/v1/monitors/groups` | List distinct group names |
 | GET/PUT/DELETE | `/api/v1/monitors/:id` | Get, update, delete |
 | GET | `/api/v1/monitors/:id/logs` | Check history |
 | PATCH | `/api/v1/monitors/:id/visibility` | Toggle public flag |
-| GET/PUT/DELETE | `/api/v1/incidents/:id` | Incident management |
+| GET | `/api/v1/incidents` | List incidents |
+| GET/PUT | `/api/v1/incidents/:id` | Incident management |
 | GET | `/api/v1/heartbeats` | List heartbeats |
 | GET | `/api/v1/stats/overview` | Dashboard stats |
 | GET | `/api/v1/stats/uptime-series?range=` | Time-series uptime (1h/6h/24h/7d/30d) |
@@ -151,6 +157,24 @@ All protected endpoints accept `Authorization: Bearer <jwt>` **or** `Authorizati
 | GET | `/api/v1/api-keys` | List API keys (key values masked) |
 | POST | `/api/v1/api-keys` | Generate new API key (full key returned once) |
 | DELETE | `/api/v1/api-keys/:id` | Revoke API key |
+
+> **Route ordering note:** `/api/v1/monitors/groups` must be registered **before** `/api/v1/monitors/:id`, and `/api/v1/public/status/group/:groupSlug` must be registered **before** `/api/v1/public/status/:slug`, to prevent Echo from matching the literal path segment as a parameter.
+
+---
+
+## Frontend Routes
+
+| Path | Component | Auth |
+|---|---|---|
+| `/login` | `Login` | public |
+| `/setup` | `Setup` | public (first run only) |
+| `/status` | `PublicStatus` | public |
+| `/status/group/:groupSlug` | `GroupPublicStatus` | public |
+| `/overview` | `Overview` | protected |
+| `/monitors` | `Monitors` | protected |
+| `/incidents` | `Incidents` | protected |
+| `/notifications` | `Notifications` | protected |
+| `/settings` | `Settings` | protected |
 
 ---
 
@@ -165,8 +189,6 @@ All protected endpoints accept `Authorization: Bearer <jwt>` **or** `Authorizati
 | `DATABASE_URL` | Yes | Full PostgreSQL connection string |
 | `JWT_SECRET` | Yes | Min 32-char random string |
 
-Copy `.env.example` to `.env` for local development. **Never commit `.env`.**
-
 ### Frontend (`web/.env`)
 
 Only used by the Vite dev server — has no effect on production builds.
@@ -176,8 +198,6 @@ Only used by the Vite dev server — has no effect on production builds.
 | `VITE_API_TARGET` | `http://localhost:8876` | Backend URL for `/api` proxy |
 | `VITE_WS_TARGET` | `ws://localhost:8876` | Backend URL for `/ws` proxy |
 
-Copy `web/.env.example` to `web/.env` for local development. **Never commit `web/.env`** (it is gitignored in `web/.gitignore`).
-
 ---
 
 ## Database Notes
@@ -185,11 +205,39 @@ Copy `web/.env.example` to `web/.env` for local development. **Never commit `web
 - All migrations are in `internal/database/migrations/` as `NNNNN_description.sql`
 - Goose runs migrations automatically on app start via embedded FS
 - New migrations: `make migrate-create name=describe_change`
-- Never edit existing migration files — always add a new one
+- **Never edit existing migration files** — always add a new one
 - `incidents.monitor_id` is nullable — incidents survive monitor deletion (`ON DELETE SET NULL`)
 - `notification_channels.type` is UNIQUE — one config per channel type
 - `app_settings` is a key-value table with upsert semantics
 - `api_keys.key` is UNIQUE; keys start with `gk_` followed by 64 hex chars
+- `monitors.group_name` — free-text group name, defaults to `''`; slugified (lowercase, spaces→hyphens) for use in public page URLs
+- `monitors.labels` — `TEXT[]` PostgreSQL array; use `pq.StringArray` / `pq.Array()` in Go
+
+---
+
+## Groups & Labels
+
+### Data model
+
+- `group_name VARCHAR(100)` — optional group assignment per monitor
+- `labels TEXT[]` — zero or more short tags per monitor
+
+### URL slugs for group pages
+
+Group names are slugified on the fly: lowercase + spaces replaced with hyphens. No dedicated slug column is stored; matching is done via SQL: `LOWER(REPLACE(group_name, ' ', '-')) = $1`.
+
+### Frontend behaviour
+
+- Monitors page shows a **grouped view** (default) with collapsible group sections and an **inline group status summary** (up/down counts)
+- **Sidebar filters**: click any group or label to filter; active filters show as dismissible badges in the toolbar
+- **Search** matches name, URL, group name, and labels
+- `MonitorModal` has a group autocomplete input (shows existing groups, allows creating new ones inline) and a labels tag input (Enter or comma to add, Backspace to remove)
+- `NextCheckBar` shows **yellow** when the monitor is actively being checked (countdown reached zero), green otherwise
+
+### Public status pages
+
+- `GET /status` — all public monitors, grouped by `group_name`; shows group nav pills
+- `GET /status/group/:groupSlug` — scoped to one group; shows breadcrumb, stat row, and monitor cards with labels
 
 ---
 
@@ -231,6 +279,7 @@ Notifications are dispatched as goroutines by `notifier.Dispatcher` when:
 - Never put business logic in `main.go`
 - Use `$1, $2, ...` PostgreSQL placeholders — never string concatenation in queries
 - New DB columns always in a new migration file, never edit existing ones
+- Use `pq.StringArray` for scanning `TEXT[]` columns; pass `pq.Array(slice)` as query parameters
 
 ### TypeScript / React
 - Functional components only, one component per file (PascalCase filename)
@@ -239,6 +288,7 @@ Notifications are dispatched as goroutines by `notifier.Dispatcher` when:
 - Custom hooks in `web/src/hooks/`, prefixed with `use`
 - Inline styles for component styling (no Tailwind classes in component JSX — Tailwind only via `index.css` for globals)
 - No inline styles for `color`, `background` — use CSS variables from `index.css` where possible
+- Shared public page utilities (`labelColor`, `groupSlugify`, `MiniBar`, `MonitorCard`, `StatusBanner`) are exported from `PublicStatus.tsx` and imported by `GroupPublicStatus.tsx`
 
 ---
 

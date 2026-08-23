@@ -66,13 +66,13 @@ genki-uptime-monitoring/
 │   │   ├── handlers/           # One file per resource group
 │   │   │   ├── apikey.go       # CRUD /api-keys
 │   │   │   ├── auth.go         # POST /auth/login, /auth/register
-│   │   │   ├── monitor.go      # CRUD + /logs + /visibility
+│   │   │   ├── monitor.go      # CRUD + /logs + /visibility + /groups
 │   │   │   ├── incident.go     # List/Get/Update incidents
 │   │   │   ├── heartbeat.go    # List + public Push endpoint
 │   │   │   ├── stats.go        # GET /stats/overview
 │   │   │   ├── uptime_series.go
 │   │   │   ├── notification.go
-│   │   │   ├── public.go       # GET /public/status (no auth)
+│   │   │   ├── public.go       # Public status pages (no auth)
 │   │   │   ├── profile.go
 │   │   │   ├── websocket.go
 │   │   │   └── appsettings.go
@@ -83,6 +83,13 @@ genki-uptime-monitoring/
 │   ├── database/
 │   │   ├── database.go         # Connect + goose migrate
 │   │   └── migrations/         # Goose SQL migration files
+│   │       ├── 00001_init.sql
+│   │       ├── 00002_add_monitor_public.sql
+│   │       ├── 00003_notification_channels.sql
+│   │       ├── 00004_fix_notification_unique.sql
+│   │       ├── 00005_app_settings.sql
+│   │       ├── 00006_incidents_soft_fk.sql
+│   │       └── 00007_monitor_groups_labels.sql   # group_name, labels TEXT[]
 │   ├── models/                 # Go structs matching DB schema
 │   ├── notifier/               # Channel senders + fan-out dispatcher
 │   └── scheduler/scheduler.go  # Cron: check due monitors, insert logs, fire notifs
@@ -90,10 +97,14 @@ genki-uptime-monitoring/
 │   ├── .env                    # Frontend env (gitignored) — VITE_API_TARGET, VITE_WS_TARGET
 │   ├── .env.example            # Template for web/.env
 │   └── src/
-│       ├── components/         # Layout, UI primitives
+│       ├── components/         # Layout, UI primitives (Card, StatusBadge, NextCheckBar…)
 │       ├── hooks/              # TanStack Query hooks (one file per resource)
+│       │   ├── useMonitors.ts  # includes useGroups()
+│       │   └── usePublicStatus.ts  # includes useGroupPublicStatus(), usePublicGroups()
 │       ├── lib/api.ts          # Axios singleton with JWT interceptor
 │       ├── pages/              # One file per route
+│       │   ├── PublicStatus.tsx       # /status — all public monitors
+│       │   └── GroupPublicStatus.tsx  # /status/group/:groupSlug
 │       ├── store/              # Zustand UI state
 │       └── types/index.ts      # Shared TypeScript types
 ├── docker-compose.yml          # Production stack
@@ -102,6 +113,19 @@ genki-uptime-monitoring/
 ├── Makefile
 └── .air.toml
 ```
+
+## Public Status Pages
+
+There are three public status endpoints, all unauthenticated:
+
+| URL | Description |
+|---|---|
+| `/status` | All public monitors, grouped by group |
+| `/status/group/:groupSlug` | Monitors belonging to one group |
+
+Group slugs are derived from the group name: lowercase, spaces replaced with hyphens. For example, `My API` → `my-api`.
+
+The main `/status` page shows group nav pills linking to each group page when groups exist.
 
 ## Makefile Reference
 
@@ -132,6 +156,7 @@ make docker-logs         Tail application logs
 - Never put business logic in `main.go`
 - Use `$1, $2, ...` PostgreSQL placeholders — no string interpolation in queries
 - New columns always in a new migration file; never edit existing migrations
+- Use `pq.StringArray` / `pq.Array()` for PostgreSQL `TEXT[]` columns
 
 ### TypeScript / React
 
@@ -141,3 +166,4 @@ make docker-logs         Tail application logs
 - Custom hooks in `web/src/hooks/`, prefixed with `use`
 - Inline styles for component styling (no Tailwind classes in JSX — Tailwind only via `index.css` for globals)
 - Prefer CSS variables from `index.css` over hardcoded color/background values
+- Shared utilities (e.g. `labelColor`, `groupSlugify`, `MiniBar`, `MonitorCard`) exported from `PublicStatus.tsx` and re-used in `GroupPublicStatus.tsx`
