@@ -16,6 +16,7 @@ import {
   useGroups,
   type CreateMonitorPayload,
 } from '@/hooks/useMonitors'
+import { useShowURLSetting, useToggleShowURL } from '@/hooks/useShowURLSetting'
 import type { Monitor, MonitorStatus } from '@/types'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -529,6 +530,7 @@ function MonitorRow({
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div
             onClick={() => visibilityMutation.mutate({ id: m.id, isPublic: !m.public })}
+            title={m.public ? 'Make private' : 'Make public'}
             style={{
               width: 32, height: 18, borderRadius: 9, cursor: 'pointer',
               background: m.public ? '#e53e3e' : '#2a2a2a',
@@ -572,6 +574,8 @@ export default function Monitors() {
   const updateMutation = useUpdateMonitor()
   const deleteMutation = useDeleteMonitor()
   const visibilityMutation = useToggleVisibility()
+  const { data: showURL = true } = useShowURLSetting()
+  const showURLMutation = useToggleShowURL()
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<MonitorStatus | 'all'>('all')
@@ -740,6 +744,18 @@ export default function Monitors() {
             >
               <Globe size={13} /> Public Page
             </a>
+            <button
+              onClick={() => showURLMutation.mutate(!showURL)}
+              title={showURL ? 'Hide URLs on public page' : 'Show URLs on public page'}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 6,
+                color: showURL ? '#4299e1' : '#555', fontSize: 12, padding: '6px 10px', cursor: 'pointer',
+              }}
+            >
+              <ExternalLink size={13} />
+              {showURL ? 'Hide URL' : 'Show URL'}
+            </button>
             <button
               onClick={() => refetch()}
               style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 6, color: '#888', fontSize: 12, padding: '6px 10px', cursor: 'pointer' }}

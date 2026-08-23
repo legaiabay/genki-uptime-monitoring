@@ -50,6 +50,15 @@ func JWT(secret string, db ...*sqlx.DB) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			authHeader := c.Request().Header.Get("Authorization")
+
+			// WebSocket connections cannot send custom headers from the browser.
+			// Fall back to the ?token= query parameter (used by the WS hook).
+			if authHeader == "" {
+				if q := c.QueryParam("token"); q != "" {
+					authHeader = "Bearer " + q
+				}
+			}
+
 			if authHeader == "" {
 				return echo.NewHTTPError(http.StatusUnauthorized, "missing authorization header")
 			}

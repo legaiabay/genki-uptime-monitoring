@@ -21,6 +21,7 @@ export default function GroupPublicStatus() {
   const monitors = data?.monitors ?? []
   const overallUptime = data?.overall_uptime ?? 0
   const siteName = data?.site_name ?? 'Status'
+  const showURL = data?.show_url ?? true
   const groupName = data?.group_name ?? groupSlug
 
   useEffect(() => {
@@ -136,7 +137,7 @@ export default function GroupPublicStatus() {
 
             {/* Monitor grid */}
             <div className="gps-monitor-grid">
-              {monitors.map(mon => <MonitorCard key={mon.id} mon={mon} />)}
+              {monitors.map(mon => <MonitorCard key={mon.id} mon={mon} showURL={showURL} />)}
             </div>
           </>
         )}

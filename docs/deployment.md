@@ -72,3 +72,19 @@ your.domain.com {
 - [ ] Passwords are hashed with bcrypt — no plain-text storage
 - [ ] All SQL queries use parameterized placeholders
 - [ ] API keys use `crypto/rand` — never `math/rand`
+
+## Password Reset
+
+Genki does not send email. Password reset is gated by a `RESET_SECRET` env var that only the server operator knows.
+
+1. Add `RESET_SECRET=<strong-random-value>` to your `.env` and restart the app.
+2. On the login page click **Forgot password?**
+3. Enter the `RESET_SECRET` value, new password, and confirmation — the backend resets the password for the admin account.
+4. Log in with the new password.
+
+If `RESET_SECRET` is not set, the `/api/v1/auth/reset-password` endpoint returns `403` and the forgot-password page is effectively non-functional.
+
+```bash
+# Generate a suitable value
+openssl rand -hex 32
+```

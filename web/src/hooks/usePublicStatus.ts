@@ -25,6 +25,7 @@ export interface PublicStatusResponse {
   monitors: PublicMonitor[]
   overall_uptime: number
   site_name: string
+  show_url: boolean
   groups: string[]
 }
 
@@ -32,6 +33,7 @@ export interface GroupPublicStatusResponse {
   monitors: PublicMonitor[]
   overall_uptime: number
   site_name: string
+  show_url: boolean
   group_name: string
   group_slug: string
 }

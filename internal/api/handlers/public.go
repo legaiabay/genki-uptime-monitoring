@@ -89,6 +89,12 @@ func (h *PublicHandler) GetStatus(c echo.Context) error {
 	_ = h.db.GetContext(ctx, &siteName,
 		`SELECT value FROM app_settings WHERE key = 'site_name'`)
 
+	showURL := true
+	var showURLVal string
+	if err := h.db.GetContext(ctx, &showURLVal, `SELECT value FROM app_settings WHERE key = 'show_url_on_public'`); err == nil {
+		showURL = showURLVal != "false"
+	}
+
 	// Collect distinct groups that have public monitors
 	var groups []string
 	_ = h.db.SelectContext(ctx, &groups,
@@ -103,6 +109,7 @@ func (h *PublicHandler) GetStatus(c echo.Context) error {
 		"monitors":       result,
 		"overall_uptime": overallUptime,
 		"site_name":      siteName,
+		"show_url":       showURL,
 		"groups":         groups,
 	})
 }
@@ -145,10 +152,17 @@ func (h *PublicHandler) GetGroupStatus(c echo.Context) error {
 	_ = h.db.GetContext(ctx, &siteName,
 		`SELECT value FROM app_settings WHERE key = 'site_name'`)
 
+	showURL := true
+	var showURLVal string
+	if err := h.db.GetContext(ctx, &showURLVal, `SELECT value FROM app_settings WHERE key = 'show_url_on_public'`); err == nil {
+		showURL = showURLVal != "false"
+	}
+
 	return c.JSON(http.StatusOK, echo.Map{
 		"monitors":       result,
 		"overall_uptime": overallUptime,
 		"site_name":      siteName,
+		"show_url":       showURL,
 		"group_name":     groupName,
 		"group_slug":     groupSlug,
 	})

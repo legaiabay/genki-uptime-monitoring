@@ -148,3 +148,42 @@ func (h *AppSettingsHandler) Update(c echo.Context) error {
 
 	return h.Get(c)
 }
+
+type setShowURLRequest struct {
+	ShowURL bool `json:"show_url"`
+}
+
+// GetShowURL returns whether monitor URLs are shown on the public status page.
+func (h *AppSettingsHandler) GetShowURL(c echo.Context) error {
+	showURL := true
+	var val string
+	if err := h.db.GetContext(c.Request().Context(), &val, `SELECT value FROM app_settings WHERE key = 'show_url_on_public'`); err == nil {
+		showURL = val != "false"
+	}
+	return c.JSON(http.StatusOK, echo.Map{"show_url": showURL})
+}
+
+// SetShowURL toggles whether monitor URLs are shown on the public status page.
+func (h *AppSettingsHandler) SetShowURL(c echo.Context) error {
+	var req setShowURLRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+
+	value := "true"
+	if !req.ShowURL {
+		value = "false"
+	}
+
+	_, err := h.db.ExecContext(c.Request().Context(),
+		`INSERT INTO app_settings (key, value, updated_at)
+		 VALUES ('show_url_on_public', $1, NOW())
+		 ON CONFLICT (key) DO UPDATE
+		   SET value = EXCLUDED.value, updated_at = NOW()`,
+		value)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to update setting")
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{"show_url": req.ShowURL})
+}

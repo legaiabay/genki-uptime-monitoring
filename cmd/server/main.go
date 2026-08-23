@@ -9,12 +9,19 @@ import (
 	"time"
 
 	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/api"
+	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/applog"
 	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/config"
 	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/database"
 	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/scheduler"
 )
 
 func main() {
+	// Create the ring-buffer log writer and redirect the default logger to it.
+	// All log.Printf / log.Fatal calls throughout the app will be captured.
+	logBuf := applog.New()
+	log.SetOutput(logBuf)
+	log.SetFlags(log.LstdFlags)
+
 	// Load config
 	cfg, err := config.Load()
 	if err != nil {
@@ -38,8 +45,8 @@ func main() {
 	sched.Start()
 	defer sched.Stop()
 
-	// Init and start HTTP server
-	srv := api.NewServer(cfg, db)
+	// Init and start HTTP server — pass logBuf so handlers can serve logs
+	srv := api.NewServer(cfg, db, logBuf)
 
 	go func() {
 		if err := srv.Start(cfg.Port); err != nil {

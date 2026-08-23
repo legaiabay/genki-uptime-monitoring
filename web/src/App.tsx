@@ -9,6 +9,7 @@ import Settings from '@/pages/Settings'
 import Notifications from '@/pages/Notifications'
 import Login from '@/pages/Login'
 import Setup from '@/pages/Setup'
+import ForgotPassword from '@/pages/ForgotPassword'
 import PublicStatus from '@/pages/PublicStatus'
 import GroupPublicStatus from '@/pages/GroupPublicStatus'
 
@@ -66,8 +67,9 @@ function AppRoutes() {
   return (
     <SetupGuard>
       <Routes>
-        <Route path="/login"  element={<Login />} />
-        <Route path="/setup"  element={<Setup />} />
+        <Route path="/login"           element={<Login />} />
+        <Route path="/setup"           element={<Setup />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/status" element={<PublicStatus />} />
         <Route path="/status/group/:groupSlug" element={<GroupPublicStatus />} />
         <Route path="/" element={<Layout />}>

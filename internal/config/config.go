@@ -12,6 +12,7 @@ type Config struct {
 	DatabaseURL string
 	JWTSecret   string
 	Environment string
+	ResetSecret string
 }
 
 func Load() (*Config, error) {
@@ -23,6 +24,7 @@ func Load() (*Config, error) {
 		DatabaseURL: getEnv("DATABASE_URL", ""),
 		JWTSecret:   getEnv("JWT_SECRET", ""),
 		Environment: getEnv("APP_ENV", "development"),
+		ResetSecret: getEnv("RESET_SECRET", ""),
 	}
 
 	if cfg.DatabaseURL == "" {

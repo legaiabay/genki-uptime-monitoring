@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, User, Key, Globe, Loader2, AlertCircle, Copy, Trash2, Plus, CheckCheck, BookOpen, Terminal, Download, TriangleAlert } from 'lucide-react'
+import { Check, User, Key, Globe, Loader2, AlertCircle, Copy, Trash2, Plus, CheckCheck, BookOpen, Terminal, Download, TriangleAlert, ScrollText, Wifi, WifiOff, XCircle } from 'lucide-react'
 import api from '@/lib/api'
 import Card from '@/components/ui/Card'
 import {
@@ -7,13 +7,15 @@ import {
   useAppSettings, useUpdateAppSettings,
 } from '@/hooks/useProfile'
 import { useApiKeys, useCreateApiKey, useDeleteApiKey } from '@/hooks/useApiKeys'
+import { useAppLogs, type LogLevel } from '@/hooks/useAppLogs'
 
-type Tab = 'profile' | 'api-keys' | 'general'
+type Tab = 'profile' | 'api-keys' | 'general' | 'logs'
 
 const tabs: Array<{ value: Tab; label: string; icon: typeof User }> = [
   { value: 'profile',  label: 'Profile',  icon: User },
   { value: 'api-keys', label: 'API Keys', icon: Key },
   { value: 'general',  label: 'General',  icon: Globe },
+  { value: 'logs',     label: 'Logs',     icon: ScrollText },
 ]
 
 const inputStyle = {
@@ -462,6 +464,10 @@ function ApiKeysTab() {
     { method: 'POST',   color: '#68d391', path: '/notifications',       desc: 'Create/update a channel',
       body: { type: 'slack', name: 'Slack', enabled: true, config: { webhook_url: 'https://hooks.slack.com/…' } } },
     { method: 'DELETE', color: '#fc8181', path: '/notifications/:id',   desc: 'Remove a channel' },
+    { method: 'GET',    color: '#63b3ed', path: '/logs',                desc: 'App log snapshot (ring buffer, last 500 entries)' },
+    { method: 'GET',    color: '#63b3ed', path: '/settings/show-url',   desc: 'Get show-URL-on-public-page setting' },
+    { method: 'PATCH',  color: '#f6ad55', path: '/settings/show-url',   desc: 'Toggle show-URL-on-public-page setting',
+      body: { show_url: true } },
     { method: 'GET',    color: '#63b3ed', path: '/profile',             desc: 'Get your profile' },
     { method: 'PUT',    color: '#f6ad55', path: '/profile',             desc: 'Update your profile',
       body: { name: 'Jane Doe', email: 'jane@example.com' } },
@@ -1065,6 +1071,161 @@ function GeneralTab() {
   )
 }
 
+// ── Logs tab ──────────────────────────────────────────────────────────────────
+
+const LEVEL_COLOR: Record<LogLevel, string> = {
+  info:  '#63b3ed',
+  warn:  '#f6ad55',
+  error: '#fc8181',
+  debug: '#a0aec0',
+}
+
+function LogsTab() {
+  const { entries, isLoading, clear, wsRef } = useAppLogs()
+  const [filter, setFilter] = useState<LogLevel | 'all'>('all')
+  const [search, setSearch] = useState('')
+  const [paused, setPaused] = useState(false)
+  const [wsConnected, setWsConnected] = useState(false)
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Track WebSocket connectivity for the status indicator.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setWsConnected(wsRef.current?.readyState === WebSocket.OPEN)
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [wsRef])
+
+  // Auto-scroll to bottom when new entries arrive (unless paused).
+  useEffect(() => {
+    if (!paused) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [entries, paused])
+
+  const visible = entries.filter(e => {
+    if (filter !== 'all' && e.level !== filter) return false
+    if (search && !e.message.toLowerCase().includes(search.toLowerCase())) return false
+    return true
+  })
+
+  function fmt(ts: string) {
+    const d = new Date(ts)
+    return d.toLocaleTimeString('en-GB', { hour12: false }) + '.' +
+      String(d.getMilliseconds()).padStart(3, '0')
+  }
+
+  function downloadLogs() {
+    const text = entries.map(e => `[${new Date(e.timestamp).toISOString()}] [${e.level.toUpperCase()}] ${e.message}`).join('\n')
+    const blob = new Blob([text], { type: 'text/plain' })
+    const url  = URL.createObjectURL(blob)
+    const a    = Object.assign(document.createElement('a'), { href: url, download: 'genki-app-logs.txt' })
+    document.body.appendChild(a); a.click(); a.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <Card style={{ padding: '16px 20px' }}>
+        {/* ── Toolbar ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+          {/* WS status badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: wsConnected ? '#68d391' : '#fc8181', background: wsConnected ? 'rgba(104,211,145,0.08)' : 'rgba(252,129,129,0.08)', border: `1px solid ${wsConnected ? 'rgba(104,211,145,0.2)' : 'rgba(252,129,129,0.2)'}`, borderRadius: 5, padding: '3px 8px' }}>
+            {wsConnected ? <Wifi size={11} /> : <WifiOff size={11} />}
+            {wsConnected ? 'Live' : 'Disconnected'}
+          </div>
+
+          {/* Entry count */}
+          <span style={{ fontSize: 11, color: '#555' }}>{visible.length} / {entries.length} entries</span>
+
+          <div style={{ flex: 1 }} />
+
+          {/* Search */}
+          <input
+            style={{ background: '#161616', border: '1px solid #2a2a2a', borderRadius: 6, color: '#e8e8e8', fontSize: 12, padding: '5px 10px', width: 180, outline: 'none' }}
+            placeholder="Search messages…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+
+          {/* Level filter */}
+          {/* Level filter — wrapper needed to position custom arrow */}
+          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+            <select
+              style={{ background: '#161616', border: '1px solid #2a2a2a', borderRadius: 6, color: '#e8e8e8', fontSize: 12, padding: '5px 32px 5px 10px', outline: 'none', cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}
+              value={filter}
+              onChange={e => setFilter(e.target.value as LogLevel | 'all')}
+            >
+              <option value="all">All levels</option>
+              <option value="info">Info</option>
+              <option value="warn">Warn</option>
+              <option value="error">Error</option>
+              <option value="debug">Debug</option>
+            </select>
+            <svg style={{ position: 'absolute', right: 9, pointerEvents: 'none', color: '#666' }} width="11" height="11" viewBox="0 0 12 12" fill="none">
+              <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+
+          {/* Pause / resume */}
+          <button
+            onClick={() => setPaused(p => !p)}
+            title={paused ? 'Resume auto-scroll' : 'Pause auto-scroll'}
+            style={{ background: paused ? 'rgba(246,173,85,0.12)' : '#161616', border: `1px solid ${paused ? 'rgba(246,173,85,0.3)' : '#2a2a2a'}`, borderRadius: 6, color: paused ? '#f6ad55' : '#555', fontSize: 12, padding: '5px 10px', cursor: 'pointer' }}
+          >
+            {paused ? '▶ Resume' : '⏸ Pause'}
+          </button>
+
+          {/* Download */}
+          <button
+            onClick={downloadLogs}
+            title="Download logs as .txt"
+            style={{ background: '#161616', border: '1px solid #2a2a2a', borderRadius: 6, color: '#555', padding: '5px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+          >
+            <Download size={13} />
+          </button>
+
+          {/* Clear */}
+          <button
+            onClick={clear}
+            title="Clear log view"
+            style={{ background: '#161616', border: '1px solid #2a2a2a', borderRadius: 6, color: '#555', padding: '5px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+          >
+            <XCircle size={13} />
+          </button>
+        </div>
+
+        {/* ── Log output ── */}
+        <div
+          ref={containerRef}
+          style={{ background: '#0a0a0a', border: '1px solid #1e1e1e', borderRadius: 8, height: 480, overflowY: 'auto', fontFamily: 'monospace', fontSize: 12 }}
+        >
+          {isLoading ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#555', padding: 16 }}>
+              <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Loading…
+            </div>
+          ) : visible.length === 0 ? (
+            <div style={{ color: '#333', padding: 16 }}>No log entries{search || filter !== 'all' ? ' matching filters' : ''}.</div>
+          ) : (
+            visible.map((e, i) => (
+              <div
+                key={i}
+                style={{ display: 'flex', gap: 10, padding: '3px 12px', borderBottom: '1px solid #111', alignItems: 'flex-start' }}
+              >
+                <span style={{ color: '#555', flexShrink: 0, userSelect: 'none', paddingTop: 1 }}>{fmt(e.timestamp)}</span>
+                <span style={{ color: LEVEL_COLOR[e.level], flexShrink: 0, width: 40, textTransform: 'uppercase', fontSize: 10, fontWeight: 700, paddingTop: 2 }}>{e.level}</span>
+                <span style={{ color: '#c8c8c8', wordBreak: 'break-word', lineHeight: 1.5 }}>{e.message}</span>
+              </div>
+            ))
+          )}
+          <div ref={bottomRef} />
+        </div>
+      </Card>
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Settings() {
@@ -1109,6 +1270,7 @@ export default function Settings() {
           {activeTab === 'profile'  && <ProfileTab />}
           {activeTab === 'api-keys' && <ApiKeysTab />}
           {activeTab === 'general'  && <GeneralTab />}
+          {activeTab === 'logs'     && <LogsTab />}
         </div>
       </div>
     </div>

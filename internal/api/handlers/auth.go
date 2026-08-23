@@ -100,6 +100,53 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	})
 }
 
+type resetPasswordRequest struct {
+	ResetSecret string `json:"reset_secret"`
+	NewPassword string `json:"new_password"`
+}
+
+func (h *AuthHandler) ResetPassword(c echo.Context) error {
+	if h.cfg.ResetSecret == "" {
+		return echo.NewHTTPError(http.StatusForbidden, "password reset is not enabled on this server")
+	}
+
+	var req resetPasswordRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+
+	if req.ResetSecret == "" || req.NewPassword == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "reset_secret and new_password are required")
+	}
+
+	if req.ResetSecret != h.cfg.ResetSecret {
+		return echo.NewHTTPError(http.StatusUnauthorized, "invalid reset secret")
+	}
+
+	if len(req.NewPassword) < 8 {
+		return echo.NewHTTPError(http.StatusBadRequest, "password must be at least 8 characters")
+	}
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to hash password")
+	}
+
+	// Reset password for all users (single-user self-hosted setup)
+	result, err := h.db.ExecContext(c.Request().Context(),
+		`UPDATE users SET password = $1`, string(hashed))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to update password")
+	}
+
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return echo.NewHTTPError(http.StatusNotFound, "no users found")
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{"message": "password reset successful"})
+}
+
 func (h *AuthHandler) Register(c echo.Context) error {
 	var req registerRequest
 	if err := c.Bind(&req); err != nil {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/api/handlers"
 	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/api/middleware"
+	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/applog"
 	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/config"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
@@ -17,7 +18,7 @@ type Server struct {
 	db   *sqlx.DB
 }
 
-func NewServer(cfg *config.Config, db *sqlx.DB) *Server {
+func NewServer(cfg *config.Config, db *sqlx.DB, logBuf *applog.Buffer) *Server {
 	e := echo.New()
 	e.HideBanner = true
 
@@ -27,12 +28,12 @@ func NewServer(cfg *config.Config, db *sqlx.DB) *Server {
 	e.Use(echomiddleware.CORS())
 
 	s := &Server{echo: e, cfg: cfg, db: db}
-	s.registerRoutes()
+	s.registerRoutes(logBuf)
 
 	return s
 }
 
-func (s *Server) registerRoutes() {
+func (s *Server) registerRoutes(logBuf *applog.Buffer) {
 	// API routes
 	api := s.echo.Group("/api/v1")
 
@@ -41,6 +42,7 @@ func (s *Server) registerRoutes() {
 	api.POST("/auth/login", authHandler.Login)
 	api.POST("/auth/register", authHandler.Register)
 	api.GET("/auth/needs-setup", authHandler.NeedsSetup)
+	api.POST("/auth/reset-password", authHandler.ResetPassword)
 
 	// Protected routes — accepts JWT or "gk_…" API keys
 	protected := api.Group("")
@@ -58,6 +60,14 @@ func (s *Server) registerRoutes() {
 	protected.PUT("/settings/general", appSettingsHandler.Update)
 	protected.POST("/settings/reset-data", appSettingsHandler.ResetAllData)
 	protected.POST("/settings/reset-monitoring", appSettingsHandler.ResetMonitoringData)
+	protected.GET("/settings/show-url", appSettingsHandler.GetShowURL)
+	protected.PATCH("/settings/show-url", appSettingsHandler.SetShowURL)
+	protected.PATCH("/settings/show-url", appSettingsHandler.SetShowURL)
+	protected.GET("/settings/show-url", appSettingsHandler.GetShowURL)
+
+	// App logs
+	logHandler := handlers.NewLogHandler(logBuf)
+	protected.GET("/logs", logHandler.Snapshot)
 
 	// Monitors
 	monitorHandler := handlers.NewMonitorHandler(s.db)
@@ -109,8 +119,8 @@ func (s *Server) registerRoutes() {
 	uptimeSeriesHandler := handlers.NewUptimeSeriesHandler(s.db)
 	protected.GET("/stats/uptime-series", uptimeSeriesHandler.GetSeries)
 
-	// WebSocket
-	wsHandler := handlers.NewWebSocketHandler(s.db)
+	// WebSocket — passes logBuf so it can stream live log entries
+	wsHandler := handlers.NewWebSocketHandler(s.db, logBuf)
 	protected.GET("/ws", wsHandler.Handle)
 
 	// Serve React frontend (catch-all)

@@ -44,7 +44,7 @@ PostgreSQL 16. Schema managed via Goose migrations in `internal/database/migrati
 - **Production**: Docker multi-stage build → single Alpine binary image
 - **Dev DB**: `docker compose -f docker-compose.dev.yml up -d`
 - **Dev backend**: `air` (live reload)
-- **Dev frontend**: `cd web && npm run dev` (proxies `/api` and `/ws` to Go on `:8876`)
+- **Dev frontend**: `cd web && npm run dev` (proxies `/api/v1/ws` with `ws:true` and `/api` to Go on `:8876`)
 - **Frontend env**: `web/.env` — Vite reads `VITE_API_TARGET` and `VITE_WS_TARGET` for proxy config (dev only, gitignored)
 
 ---
@@ -60,7 +60,8 @@ genki-uptime-monitoring/
 │   │   ├── static.go                    # Embed note (prod: web/dist embedded here)
 │   │   ├── handlers/
 │   │   │   ├── apikey.go                # CRUD /api-keys + LookupAPIKey helper
-│   │   │   ├── auth.go                  # POST /auth/login, /auth/register
+│   │   │   ├── applog.go                # GET /logs — snapshot from ring buffer
+│   │   │   ├── auth.go                  # POST /auth/login, /auth/register, /auth/reset-password
 │   │   │   ├── monitor.go               # CRUD + /logs + /visibility + /groups
 │   │   │   ├── incident.go              # List/Get/Update incidents
 │   │   │   ├── heartbeat.go             # List + public Push endpoint
@@ -69,10 +70,11 @@ genki-uptime-monitoring/
 │   │   │   ├── notification.go          # CRUD notification_channels
 │   │   │   ├── public.go                # GET /public/status, /public/status/group/:slug, /public/groups
 │   │   │   ├── profile.go               # GET/PUT /profile, POST /profile/password
-│   │   │   ├── websocket.go             # WebSocket hub
+│   │   │   ├── websocket.go             # WebSocket hub + log tail broadcast
 │   │   │   └── appsettings.go           # GET/PUT /settings/general
 │   │   └── middleware/
-│   │       └── jwt.go                   # JWT + API key validation, GetUserID(c)
+│   │       └── jwt.go                   # JWT + API key validation, GetUserID(c); accepts ?token= for WS
+│   ├── applog/applog.go                 # Ring buffer (500 entries) io.Writer + Subscribe/fan-out
 │   ├── checker/checker.go               # HTTP healthcheck logic → Result
 │   ├── config/config.go                 # Env var loading
 │   ├── database/
@@ -100,11 +102,12 @@ genki-uptime-monitoring/
 │       ├── hooks/                       # useMonitors (+ useGroups), useIncidents, useHeartbeats,
 │       │   │                            # useProfile, useNotifications, useUptimeSeries,
 │       │   │                            # useOverviewStats, usePublicStatus (+ useGroupPublicStatus,
-│       │   │                            # usePublicGroups), useSiteTitle, useApiKeys
+│       │   │                            # usePublicGroups), useSiteTitle, useApiKeys,
+│       │   │                            # useAppLogs, useShowURLSetting
 │       ├── lib/api.ts                   # Axios instance with JWT interceptor + 401 redirect
 │       ├── pages/                       # Overview, Monitors, Incidents, Heartbeats,
 │       │   │                            # Notifications, Settings, Login, Setup,
-│       │   │                            # PublicStatus, GroupPublicStatus
+│       │   │                            # ForgotPassword, PublicStatus, GroupPublicStatus
 │       ├── store/                       # Zustand stores (UI state)
 │       ├── types/index.ts               # Shared TypeScript types (Monitor has group_name, labels)
 │       └── App.tsx                      # QueryClient, BrowserRouter, routes
@@ -125,6 +128,8 @@ genki-uptime-monitoring/
 |---|---|---|
 | POST | `/api/v1/auth/login` | Login, returns JWT + user |
 | POST | `/api/v1/auth/register` | Register first user |
+| POST | `/api/v1/auth/reset-password` | Reset password using `RESET_SECRET` (disabled if env not set) |
+| GET  | `/api/v1/auth/needs-setup` | Returns whether first-run setup is needed |
 | POST | `/api/v1/heartbeats/:slug` | Push heartbeat ping |
 | GET  | `/api/v1/public/status` | All public monitors + logs, grouped |
 | GET  | `/api/v1/public/status/:slug` | Single public monitor by slug |
@@ -137,9 +142,11 @@ All protected endpoints accept `Authorization: Bearer <jwt>` **or** `Authorizati
 
 | Method | Path | Description |
 |---|---|---|
+| GET | `/api/v1/logs` | App log snapshot (ring buffer) |
 | GET/PUT | `/api/v1/profile` | Get/update user profile |
 | POST | `/api/v1/profile/password` | Change password |
 | GET/PUT | `/api/v1/settings/general` | App-wide settings (site_name, timezone, etc.) |
+| GET/PATCH | `/api/v1/settings/show-url` | Get/toggle whether monitor URLs show on public pages |
 | GET | `/api/v1/monitors` | List monitors (ordered by group_name, then created_at) |
 | POST | `/api/v1/monitors` | Create monitor |
 | GET | `/api/v1/monitors/groups` | List distinct group names |
@@ -168,6 +175,7 @@ All protected endpoints accept `Authorization: Bearer <jwt>` **or** `Authorizati
 |---|---|---|
 | `/login` | `Login` | public |
 | `/setup` | `Setup` | public (first run only) |
+| `/forgot-password` | `ForgotPassword` | public |
 | `/status` | `PublicStatus` | public |
 | `/status/group/:groupSlug` | `GroupPublicStatus` | public |
 | `/overview` | `Overview` | protected |
@@ -188,6 +196,7 @@ All protected endpoints accept `Authorization: Bearer <jwt>` **or** `Authorizati
 | `PORT` | No | HTTP listen address (default: `:8080`) |
 | `DATABASE_URL` | Yes | Full PostgreSQL connection string |
 | `JWT_SECRET` | Yes | Min 32-char random string |
+| `RESET_SECRET` | No | If set, enables `POST /api/v1/auth/reset-password` — used by the forgot-password flow |
 
 ### Frontend (`web/.env`)
 
@@ -338,10 +347,25 @@ The Dockerfile uses a 3-stage build:
 
 ---
 
+## App Log Viewer
+
+- `internal/applog.Buffer` is an `io.Writer` ring buffer (capacity 500); created in `main.go` and set as the output for `log.SetOutput`
+- All `log.Printf` / `log.Fatal` output throughout the app is captured automatically
+- `GET /api/v1/logs` returns `{ "data": [...] }` — snapshot of buffered entries ordered oldest-first
+- Each entry: `{ "timestamp": RFC3339, "level": "info"|"warn"|"error"|"debug", "message": string }`
+- Level detection sniffs the first ~20 chars for `ERR`/`WARN`/`DEBUG` keywords; default is `info`
+- `WebSocketHandler` subscribes to the buffer via `logBuf.Subscribe()` and broadcasts `{"type":"log","payload":{...}}` to all connected clients via the hub
+- `useAppLogs` hook: fetches snapshot on mount (stale-time: Infinity), opens WS, appends live entries; caps local list at 500
+- **WS auth**: browsers cannot send `Authorization` headers during WebSocket upgrade — token is passed as `?token=<jwt>` query param; JWT middleware reads it as fallback when the header is absent
+- Settings → Logs tab features: live/disconnected badge, entry count, message search, level filter, pause/resume auto-scroll, download `.txt`, clear view
+
+---
+
 ## Security Notes
 
 - `.env` is in `.gitignore` — never commit it
 - `JWT_SECRET` must be at least 32 characters
+- `RESET_SECRET` (optional) gates the forgot-password feature — if not set the endpoint returns 403
 - WebSocket `CheckOrigin` should be restricted in production (currently allows all origins)
 - Passwords are hashed with bcrypt (cost=10)
 - All SQL queries use parameterized placeholders

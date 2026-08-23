@@ -145,9 +145,20 @@ export default function Login() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
-              <a href="#" style={{ fontSize: 12, color: '#e53e3e', textDecoration: 'none' }}>
+              <button
+                type="button"
+                onClick={() => navigate('/forgot-password')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: 12,
+                  color: '#e53e3e',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+              >
                 Forgot password?
-              </a>
+              </button>
             </div>
 
             <button

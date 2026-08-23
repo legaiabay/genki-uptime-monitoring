@@ -56,7 +56,7 @@ export function MiniBar({ logs }: { logs: PublicLog[] }) {
   )
 }
 
-export function MonitorCard({ mon }: { mon: PublicMonitor }) {
+export function MonitorCard({ mon, showURL = true }: { mon: PublicMonitor; showURL?: boolean }) {
   const color = statusColor[mon.status] ?? '#555'
   return (
     <div style={{
@@ -76,7 +76,7 @@ export function MonitorCard({ mon }: { mon: PublicMonitor }) {
             fontSize: 11, color: '#555', marginTop: 2,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
-            {mon.url}
+            {showURL ? mon.url : ''}
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
@@ -176,10 +176,12 @@ function GroupSection({
   groupName,
   monitors,
   showLink,
+  showURL = true,
 }: {
   groupName: string
   monitors: PublicMonitor[]
   showLink: boolean
+  showURL?: boolean
 }) {
   const navigate = useNavigate()
   const hasDown = monitors.some(m => m.status === 'down')
@@ -218,7 +220,7 @@ function GroupSection({
         )}
       </div>
       <div className="ps-monitor-grid">
-        {monitors.map(mon => <MonitorCard key={mon.id} mon={mon} />)}
+        {monitors.map(mon => <MonitorCard key={mon.id} mon={mon} showURL={showURL} />)}
       </div>
     </div>
   )
@@ -232,6 +234,7 @@ export default function PublicStatus() {
   const monitors = data?.monitors ?? []
   const overallUptime = data?.overall_uptime ?? 0
   const siteName = data?.site_name ?? 'Status'
+  const showURL = data?.show_url ?? true
   const groups = data?.groups ?? []
 
   useEffect(() => {
@@ -327,7 +330,7 @@ export default function PublicStatus() {
 
         {/* Grouped sections */}
         {Object.entries(grouped).map(([group, items]) => (
-          <GroupSection key={group} groupName={group} monitors={items} showLink={true} />
+          <GroupSection key={group} groupName={group} monitors={items} showLink={true} showURL={showURL} />
         ))}
 
         {/* Ungrouped */}
@@ -340,7 +343,7 @@ export default function PublicStatus() {
               </div>
             )}
             <div className="ps-monitor-grid">
-              {ungrouped.map(mon => <MonitorCard key={mon.id} mon={mon} />)}
+              {ungrouped.map(mon => <MonitorCard key={mon.id} mon={mon} showURL={showURL} />)}
             </div>
           </div>
         )}

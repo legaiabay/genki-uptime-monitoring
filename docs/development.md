@@ -54,6 +54,16 @@ Copy `web/.env.example` to `web/.env` to get started. The file is gitignored —
 
 > These variables only affect the local dev server. They have no effect on the production build.
 
+## Backend Environment Variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `JWT_SECRET` | Yes | Random string, min 32 chars |
+| `APP_ENV` | No | `development` (default) or `production` |
+| `PORT` | No | HTTP listen port (default `:8876` via air, `:8080` in production) |
+| `RESET_SECRET` | No | If set, enables the forgot-password flow at `POST /api/v1/auth/reset-password` |
+
 ## Project Structure
 
 ```
@@ -65,7 +75,7 @@ genki-uptime-monitoring/
 │   │   ├── static.go           # Embedded frontend (production)
 │   │   ├── handlers/           # One file per resource group
 │   │   │   ├── apikey.go       # CRUD /api-keys
-│   │   │   ├── auth.go         # POST /auth/login, /auth/register
+│   │   │   ├── auth.go         # POST /auth/login, /auth/register, /auth/reset-password
 │   │   │   ├── monitor.go      # CRUD + /logs + /visibility + /groups
 │   │   │   ├── incident.go     # List/Get/Update incidents
 │   │   │   ├── heartbeat.go    # List + public Push endpoint
@@ -103,6 +113,7 @@ genki-uptime-monitoring/
 │       │   └── usePublicStatus.ts  # includes useGroupPublicStatus(), usePublicGroups()
 │       ├── lib/api.ts          # Axios singleton with JWT interceptor
 │       ├── pages/              # One file per route
+│       │   ├── ForgotPassword.tsx     # /forgot-password — reset via RESET_SECRET
 │       │   ├── PublicStatus.tsx       # /status — all public monitors
 │       │   └── GroupPublicStatus.tsx  # /status/group/:groupSlug
 │       ├── store/              # Zustand UI state
