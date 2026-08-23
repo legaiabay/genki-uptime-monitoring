@@ -2,6 +2,7 @@ package checker
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -79,7 +80,7 @@ func (c *HTTPChecker) Check(ctx context.Context, monitor *models.Monitor) (*Resu
 		Status:       status,
 		ResponseTime: responseTime,
 		StatusCode:   &statusCode,
-		Message:      http.StatusText(statusCode),
+		Message:      fmt.Sprintf("%d %s", statusCode, http.StatusText(statusCode)),
 		CheckedAt:    time.Now(),
 	}, nil
 }

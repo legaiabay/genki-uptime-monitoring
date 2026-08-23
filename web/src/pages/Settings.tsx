@@ -487,8 +487,68 @@ r = requests.get(
 )
 monitors = r.json()['data']`
 
-  const [codeTab, setCodeTab] = useState<'curl' | 'js' | 'python'>('curl')
-  const codeMap = { curl: curlExample, js: jsExample, python: pyExample }
+  const goExample = `package main
+
+import (
+  "encoding/json"
+  "fmt"
+  "net/http"
+)
+
+func main() {
+  req, _ := http.NewRequest("GET", "${baseUrl}/monitors", nil)
+  req.Header.Set("Authorization", "Bearer gk_your_api_key_here")
+
+  resp, _ := http.DefaultClient.Do(req)
+  defer resp.Body.Close()
+
+  var result map[string]any
+  json.NewDecoder(resp.Body).Decode(&result)
+  fmt.Println(result["data"])
+}`
+
+  const phpExample = `<?php
+$ch = curl_init('${baseUrl}/monitors');
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER     => [
+        'Authorization: Bearer gk_your_api_key_here',
+    ],
+]);
+$body = curl_exec($ch);
+curl_close($ch);
+
+$monitors = json_decode($body, true)['data'];`
+
+  const rubyExample = `require 'net/http'
+require 'json'
+
+uri  = URI('${baseUrl}/monitors')
+req  = Net::HTTP::Get.new(uri)
+req['Authorization'] = 'Bearer gk_your_api_key_here'
+
+res      = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https') { |h| h.request(req) }
+monitors = JSON.parse(res.body)['data']`
+
+  const javaExample = `import java.net.URI;
+import java.net.http.*;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        HttpClient client = HttpClient.newHttpClient();
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create("${baseUrl}/monitors"))
+            .header("Authorization", "Bearer gk_your_api_key_here")
+            .build();
+
+        HttpResponse<String> response =
+            client.send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println(response.body());
+    }
+}`
+
+  const [codeTab, setCodeTab] = useState<'curl' | 'js' | 'python' | 'go' | 'php' | 'ruby' | 'java'>('curl')
+  const codeMap = { curl: curlExample, js: jsExample, python: pyExample, go: goExample, php: phpExample, ruby: rubyExample, java: javaExample }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -555,81 +615,6 @@ monitors = r.json()['data']`
             </tbody>
           </table>
         )}
-      </Card>
-
-      {/* ── API Reference card ── */}
-      <Card style={{ padding: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-          <BookOpen size={14} color="#e53e3e" />
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8' }}>API Reference</div>
-        </div>
-        <p style={{ fontSize: 12, color: '#555', marginBottom: 20, lineHeight: 1.6 }}>
-          All protected endpoints accept either a session JWT or an API key as a Bearer token.
-          The base URL is <code style={{ color: '#888', background: '#161616', padding: '1px 6px', borderRadius: 3, fontSize: 11 }}>{baseUrl}</code>.
-        </p>
-
-        {/* Authentication snippet */}
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <Terminal size={13} color="#888" />
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Authentication</span>
-          </div>
-          <div style={{ background: '#0e0e0e', border: '1px solid #222', borderRadius: 8, overflow: 'hidden' }}>
-            {/* tab bar */}
-            <div style={{ display: 'flex', borderBottom: '1px solid #1e1e1e' }}>
-              {(['curl', 'js', 'python'] as const).map(t => (
-                <button
-                  key={t}
-                  onClick={() => setCodeTab(t)}
-                  style={{
-                    background: codeTab === t ? '#161616' : 'none',
-                    border: 'none', borderRight: '1px solid #1e1e1e',
-                    color: codeTab === t ? '#e8e8e8' : '#555',
-                    fontSize: 11, padding: '7px 14px', cursor: 'pointer',
-                    fontWeight: codeTab === t ? 500 : 400,
-                  }}
-                >
-                  {t === 'js' ? 'JavaScript' : t === 'python' ? 'Python' : 'cURL'}
-                </button>
-              ))}
-              <div style={{ flex: 1 }} />
-              <CopyButton text={codeMap[codeTab]} />
-            </div>
-            <pre style={{ margin: 0, padding: '14px 16px', fontSize: 12, color: '#a8d8a8', overflowX: 'auto', lineHeight: 1.6 }}>
-              <code>{codeMap[codeTab]}</code>
-            </pre>
-          </div>
-        </div>
-
-        {/* Endpoints table */}
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
-            Available Endpoints
-          </div>
-          <div style={{ border: '1px solid #1e1e1e', borderRadius: 8, overflow: 'hidden' }}>
-            {endpoints.map((ep, idx) => (
-              <div
-                key={idx}
-                style={{
-                  display: 'grid', gridTemplateColumns: '64px 1fr auto',
-                  alignItems: 'center', gap: 12, padding: '9px 14px',
-                  borderBottom: idx < endpoints.length - 1 ? '1px solid #161616' : 'none',
-                  background: idx % 2 === 0 ? 'transparent' : '#0e0e0e',
-                }}
-              >
-                <span style={{
-                  fontSize: 10, fontWeight: 700, color: ep.color,
-                  background: ep.color + '18', padding: '2px 6px', borderRadius: 3,
-                  textAlign: 'center', letterSpacing: '0.04em',
-                }}>
-                  {ep.method}
-                </span>
-                <code style={{ fontSize: 12, color: '#888' }}>{ep.path}</code>
-                <span style={{ fontSize: 12, color: '#555', textAlign: 'right' }}>{ep.desc}</span>
-              </div>
-            ))}
-          </div>
-        </div>
       </Card>
 
       {/* ── Download Collections card ── */}
@@ -707,6 +692,82 @@ monitors = r.json()['data']`
             >
               <Download size={13} /> Download for Bruno
             </button>
+          </div>
+        </div>
+      </Card>
+
+      {/* ── API Reference card ── */}
+      <Card style={{ padding: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <BookOpen size={14} color="#e53e3e" />
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8' }}>API Reference</div>
+        </div>
+        <p style={{ fontSize: 12, color: '#555', marginBottom: 20, lineHeight: 1.6 }}>
+          All protected endpoints accept either a session JWT or an API key as a Bearer token.
+          The base URL is <code style={{ color: '#888', background: '#161616', padding: '1px 6px', borderRadius: 3, fontSize: 11 }}>{baseUrl}</code>.
+        </p>
+
+        {/* Authentication snippet */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <Terminal size={13} color="#888" />
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Authentication</span>
+          </div>
+          <div style={{ background: '#0e0e0e', border: '1px solid #222', borderRadius: 8, overflow: 'hidden' }}>
+            {/* tab bar */}
+            <div style={{ display: 'flex', borderBottom: '1px solid #1e1e1e', flexWrap: 'wrap' }}>
+              {(['curl', 'js', 'python', 'go', 'php', 'ruby', 'java'] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => setCodeTab(t)}
+                  style={{
+                    background: codeTab === t ? '#161616' : 'none',
+                    border: 'none', borderRight: '1px solid #1e1e1e',
+                    color: codeTab === t ? '#e8e8e8' : '#555',
+                    fontSize: 11, padding: '7px 14px', cursor: 'pointer',
+                    fontWeight: codeTab === t ? 500 : 400,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {t === 'js' ? 'JavaScript' : t === 'python' ? 'Python' : t === 'go' ? 'Go' : t === 'php' ? 'PHP' : t === 'ruby' ? 'Ruby' : t === 'java' ? 'Java' : 'cURL'}
+                </button>
+              ))}
+              <div style={{ flex: 1 }} />
+              <CopyButton text={codeMap[codeTab]} />
+            </div>
+            <pre style={{ margin: 0, padding: '14px 16px', fontSize: 12, color: '#a8d8a8', overflowX: 'auto', lineHeight: 1.6 }}>
+              <code>{codeMap[codeTab]}</code>
+            </pre>
+          </div>
+        </div>
+
+        {/* Endpoints table */}
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+            Available Endpoints
+          </div>
+          <div style={{ border: '1px solid #1e1e1e', borderRadius: 8, overflow: 'hidden' }}>
+            {endpoints.map((ep, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: 'grid', gridTemplateColumns: '64px 1fr auto',
+                  alignItems: 'center', gap: 12, padding: '9px 14px',
+                  borderBottom: idx < endpoints.length - 1 ? '1px solid #161616' : 'none',
+                  background: idx % 2 === 0 ? 'transparent' : '#0e0e0e',
+                }}
+              >
+                <span style={{
+                  fontSize: 10, fontWeight: 700, color: ep.color,
+                  background: ep.color + '18', padding: '2px 6px', borderRadius: 3,
+                  textAlign: 'center', letterSpacing: '0.04em',
+                }}>
+                  {ep.method}
+                </span>
+                <code style={{ fontSize: 12, color: '#888' }}>{ep.path}</code>
+                <span style={{ fontSize: 12, color: '#555', textAlign: 'right' }}>{ep.desc}</span>
+              </div>
+            ))}
           </div>
         </div>
       </Card>
