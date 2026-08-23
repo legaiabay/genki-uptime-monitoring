@@ -2,6 +2,8 @@ package scheduler
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -142,14 +144,27 @@ func (s *Scheduler) checkMonitor(ctx context.Context, mon *models.Monitor) {
 	}
 
 	if wentRecovery {
+		var downtimeDuration string
+		var startedAt time.Time
+		err := s.db.QueryRowContext(ctx,
+			`SELECT started_at FROM incidents
+			 WHERE monitor_id = $1 AND status != 'resolved'
+			 ORDER BY started_at DESC LIMIT 1`, mon.ID).Scan(&startedAt)
+		if err == nil {
+			downtimeDuration = formatDuration(result.CheckedAt.Sub(startedAt))
+		} else if err != sql.ErrNoRows {
+			log.Printf("[scheduler] error querying incident start for %s: %v", mon.Name, err)
+		}
+
 		s.resolveIncident(ctx, mon.ID)
 		s.dispatcher.Notify(ctx, notifier.Payload{
-			MonitorName:  mon.Name,
-			MonitorURL:   string(mon.URL),
-			Status:       string(result.Status),
-			ResponseTime: result.ResponseTime,
-			CheckedAt:    result.CheckedAt,
-			Event:        notifier.EventRecovery,
+			MonitorName:      mon.Name,
+			MonitorURL:       string(mon.URL),
+			Status:           string(result.Status),
+			ResponseTime:     result.ResponseTime,
+			CheckedAt:        result.CheckedAt,
+			Event:            notifier.EventRecovery,
+			DowntimeDuration: downtimeDuration,
 		})
 	}
 }
@@ -177,4 +192,19 @@ func (s *Scheduler) resolveIncident(ctx context.Context, monitorID int64) {
 	if err != nil {
 		log.Printf("[scheduler] error resolving incident for monitor %d: %v", monitorID, err)
 	}
+}
+
+// formatDuration formats a duration into a human-readable string like "1h 23m 45s".
+func formatDuration(d time.Duration) string {
+	d = d.Round(time.Second)
+	h := int(d.Hours())
+	m := int(d.Minutes()) % 60
+	s := int(d.Seconds()) % 60
+	if h > 0 {
+		return fmt.Sprintf("%dh %dm %ds", h, m, s)
+	}
+	if m > 0 {
+		return fmt.Sprintf("%dm %ds", m, s)
+	}
+	return fmt.Sprintf("%ds", s)
 }

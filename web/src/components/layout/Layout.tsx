@@ -6,9 +6,9 @@ export default function Layout() {
   useSiteTitle()
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#111' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--color-bg)' }}>
       <Sidebar />
-      <main style={{ flex: 1, overflowY: 'auto', background: '#111' }}>
+      <main style={{ flex: 1, overflowY: 'auto', background: 'var(--color-bg)' }}>
         <Outlet />
       </main>
     </div>

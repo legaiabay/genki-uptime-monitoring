@@ -76,7 +76,8 @@ genki-uptime-monitoring/
 │   │   ├── handlers/           # One file per resource group
 │   │   │   ├── apikey.go       # CRUD /api-keys
 │   │   │   ├── auth.go         # POST /auth/login, /auth/register, /auth/reset-password
-│   │   │   ├── monitor.go      # CRUD + /logs + /visibility + /groups
+│   │   │   ├── monitor.go      # CRUD + /logs + /visibility + /groups + /favorite + /bulk
+│   │   │   ├── grouplabel.go   # GET/PUT/DELETE /settings/groups + /settings/labels
 │   │   │   ├── incident.go     # List/Get/Update incidents
 │   │   │   ├── heartbeat.go    # List + public Push endpoint
 │   │   │   ├── stats.go        # GET /stats/overview
@@ -99,7 +100,8 @@ genki-uptime-monitoring/
 │   │       ├── 00004_fix_notification_unique.sql
 │   │       ├── 00005_app_settings.sql
 │   │       ├── 00006_incidents_soft_fk.sql
-│   │       └── 00007_monitor_groups_labels.sql   # group_name, labels TEXT[]
+│   │       ├── 00007_monitor_groups_labels.sql   # group_name, labels TEXT[]
+│   │       └── 00008_add_monitor_favorite.sql    # favorite BOOLEAN
 │   ├── models/                 # Go structs matching DB schema
 │   ├── notifier/               # Channel senders + fan-out dispatcher
 │   └── scheduler/scheduler.go  # Cron: check due monitors, insert logs, fire notifs
@@ -108,8 +110,12 @@ genki-uptime-monitoring/
 │   ├── .env.example            # Template for web/.env
 │   └── src/
 │       ├── components/         # Layout, UI primitives (Card, StatusBadge, NextCheckBar…)
+│       │   ├── layout/         # Sidebar (with theme toggle + user avatar), Layout
+│       │   ├── settings/       # Settings tab components (GroupsLabelsTab…)
+│       │   └── ui/             # Card, StatusBadge, MiniSparkline, UptimeBars, NextCheckBar, UserAvatar
 │       ├── hooks/              # TanStack Query hooks (one file per resource)
-│       │   ├── useMonitors.ts  # includes useGroups()
+│       │   ├── useMonitors.ts  # includes useGroups(), useToggleFavorite(), useBulkUpdateMonitors()
+│       │   ├── useGroupsLabels.ts  # Groups & Labels manager hooks
 │       │   └── usePublicStatus.ts  # includes useGroupPublicStatus(), usePublicGroups()
 │       ├── lib/api.ts          # Axios singleton with JWT interceptor
 │       ├── pages/              # One file per route
@@ -117,6 +123,7 @@ genki-uptime-monitoring/
 │       │   ├── PublicStatus.tsx       # /status — all public monitors
 │       │   └── GroupPublicStatus.tsx  # /status/group/:groupSlug
 │       ├── store/              # Zustand UI state
+│       │   └── themeStore.ts   # light/dark theme, persisted to localStorage
 │       └── types/index.ts      # Shared TypeScript types
 ├── docker-compose.yml          # Production stack
 ├── docker-compose.dev.yml      # Dev: PostgreSQL only

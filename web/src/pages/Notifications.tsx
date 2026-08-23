@@ -15,8 +15,8 @@ import {
 // ── styles ────────────────────────────────────────────────────────────────────
 
 const inputStyle = {
-  width: '100%', background: '#161616', border: '1px solid #2a2a2a',
-  borderRadius: 6, color: '#e8e8e8', fontSize: 13, padding: '8px 12px', outline: 'none',
+  width: '100%', background: 'var(--color-input-bg)', border: '1px solid var(--color-border)',
+  borderRadius: 6, color: 'var(--color-text)', fontSize: 13, padding: '8px 12px', outline: 'none',
 } as const
 
 const textareaStyle = {
@@ -24,18 +24,19 @@ const textareaStyle = {
   minHeight: 72, fontFamily: 'monospace', fontSize: 12, lineHeight: 1.5,
 }
 
-const labelStyle = { fontSize: 12, color: '#888', display: 'block', marginBottom: 6 } as const
+const labelStyle = { fontSize: 12, color: 'var(--color-text-muted)', display: 'block', marginBottom: 6 } as const
 
 const DEFAULT_DOWN_MSG     = '🔴 *{{monitor_name}}* is *down*\nURL: {{monitor_url}}\nError: {{error_message}}\nAt: {{checked_at}}'
-const DEFAULT_RECOVERY_MSG = '✅ *{{monitor_name}}* has *recovered*\nURL: {{monitor_url}}\nResponse: {{response_time}}ms\nAt: {{checked_at}}'
+const DEFAULT_RECOVERY_MSG = '✅ *{{monitor_name}}* has *recovered*\nURL: {{monitor_url}}\nResponse: {{response_time}}ms\nDowntime: {{downtime_duration}}\nAt: {{checked_at}}'
 
 const TEMPLATE_VARS = [
-  { var: '{{monitor_name}}',  desc: 'Monitor name' },
-  { var: '{{monitor_url}}',   desc: 'Monitor URL' },
-  { var: '{{status}}',        desc: 'Current status (up/down/degraded)' },
-  { var: '{{response_time}}', desc: 'Response time in ms' },
-  { var: '{{error_message}}', desc: 'Error or HTTP status message when down' },
-  { var: '{{checked_at}}',    desc: 'Timestamp of the check' },
+  { var: '{{monitor_name}}',      desc: 'Monitor name' },
+  { var: '{{monitor_url}}',       desc: 'Monitor URL' },
+  { var: '{{status}}',            desc: 'Current status (up/down/degraded)' },
+  { var: '{{response_time}}',     desc: 'Response time in ms' },
+  { var: '{{error_message}}',     desc: 'Error or HTTP status message when down' },
+  { var: '{{checked_at}}',        desc: 'Timestamp of the check' },
+  { var: '{{downtime_duration}}', desc: 'How long the monitor was down (recovery only)' },
 ]
 
 function renderMsg(tmpl: string, vars: Record<string, string>) {
@@ -52,12 +53,13 @@ const SAMPLE_DOWN = {
 }
 
 const SAMPLE_RECOVERY = {
-  monitor_name:  'Test Monitor',
-  monitor_url:   'https://example.com/health',
-  status:        'up',
-  response_time: '124',
-  error_message: '',
-  checked_at:    new Date().toISOString(),
+  monitor_name:      'Test Monitor',
+  monitor_url:       'https://example.com/health',
+  status:            'up',
+  response_time:     '124',
+  error_message:     '',
+  checked_at:        new Date().toISOString(),
+  downtime_duration: '5m 30s',
 }
 
 // ── sub-components ────────────────────────────────────────────────────────────
@@ -80,15 +82,15 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 function TemplateVarsHelp({ show, onToggle }: { show: boolean; onToggle: () => void }) {
   return (
     <div style={{ marginTop: 6 }}>
-      <button onClick={onToggle} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: '#555', fontSize: 11, cursor: 'pointer', padding: 0 }}>
+      <button onClick={onToggle} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: 'var(--color-text-dim)', fontSize: 11, cursor: 'pointer', padding: 0 }}>
         <Info size={11} /> Available variables {show ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
       </button>
       {show && (
-        <div style={{ marginTop: 6, background: '#111', border: '1px solid #1e1e1e', borderRadius: 6, padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ marginTop: 6, background: 'var(--color-bg-deep)', border: '1px solid var(--color-border-subtle)', borderRadius: 6, padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
           {TEMPLATE_VARS.map(v => (
             <div key={v.var} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-              <code style={{ fontSize: 10, color: '#e53e3e', background: '#1e1e1e', padding: '1px 5px', borderRadius: 3, flexShrink: 0 }}>{v.var}</code>
-              <span style={{ fontSize: 11, color: '#555' }}>{v.desc}</span>
+              <code style={{ fontSize: 10, color: '#e53e3e', background: 'var(--color-surface-2)', padding: '1px 5px', borderRadius: 3, flexShrink: 0 }}>{v.var}</code>
+              <span style={{ fontSize: 11, color: 'var(--color-text-dim)' }}>{v.desc}</span>
             </div>
           ))}
         </div>
@@ -106,9 +108,9 @@ function TestButton({
   state: TestState; error?: string
   onClick: () => void; disabled?: boolean
 }) {
-  const bg    = state === 'success' ? '#276749' : state === 'error' ? '#7B1C1C' : '#1e1e1e'
-  const bc    = state === 'success' ? '#276749' : state === 'error' ? '#7B1C1C' : '#2a2a2a'
-  const color = state === 'error' ? '#fc8181' : state === 'success' ? '#68d391' : '#888'
+  const bg    = state === 'success' ? '#276749' : state === 'error' ? '#7B1C1C' : 'var(--color-surface-2)'
+  const bc    = state === 'success' ? '#276749' : state === 'error' ? '#7B1C1C' : 'var(--color-border)'
+  const color = state === 'error' ? '#fc8181' : state === 'success' ? '#68d391' : 'var(--color-text-muted)'
   return (
     <button
       onClick={onClick}
@@ -146,8 +148,8 @@ function ChannelCard({ icon, title, desc, enabled, onToggle, children }: {
             {icon}
           </div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8' }}>{title}</div>
-            <div style={{ fontSize: 11, color: '#555' }}>{desc}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{title}</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-dim)' }}>{desc}</div>
           </div>
         </div>
         <Toggle checked={enabled} onChange={onToggle} />
@@ -176,19 +178,19 @@ function WebhookPayloadPreview() {
     <div style={{ marginTop: 2 }}>
       <button
         onClick={() => setShow(s => !s)}
-        style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: '#555', fontSize: 11, cursor: 'pointer', padding: 0 }}
+        style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: 'var(--color-text-dim)', fontSize: 11, cursor: 'pointer', padding: 0 }}
       >
         <Info size={11} /> Example payload {show ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
       </button>
       {show && (
-        <div style={{ marginTop: 6, background: '#0d0d0d', border: '1px solid #1e1e1e', borderRadius: 6, padding: '10px 12px' }}>
-          <div style={{ fontSize: 10, color: '#555', marginBottom: 6 }}>
-            POST <code style={{ color: '#888' }}>application/json</code> — sent on every status change
+        <div style={{ marginTop: 6, background: 'var(--color-bg-deep)', border: '1px solid var(--color-border-subtle)', borderRadius: 6, padding: '10px 12px' }}>
+          <div style={{ fontSize: 10, color: 'var(--color-text-dim)', marginBottom: 6 }}>
+            POST <code style={{ color: 'var(--color-text-muted)' }}>application/json</code> — sent on every status change
           </div>
           <pre style={{ margin: 0, fontSize: 11, color: '#a0aec0', lineHeight: 1.6, overflowX: 'auto' }}>
             {JSON.stringify(WEBHOOK_PAYLOAD_DOWN, null, 2)}
           </pre>
-          <div style={{ marginTop: 8, fontSize: 10, color: '#555' }}>
+          <div style={{ marginTop: 8, fontSize: 10, color: 'var(--color-text-dim)' }}>
             <code style={{ color: '#e53e3e' }}>event</code> is <code style={{ color: '#68d391' }}>"down"</code> or <code style={{ color: '#68d391' }}>"recovery"</code> — use it to branch your handler logic.
           </div>
         </div>
@@ -304,16 +306,16 @@ function WebhookChannelForm(props: WebhookFormProps) {
         <div>
           <label style={labelStyle}>{props.urlLabel}</label>
           <input style={inputStyle} value={url} onChange={e => setUrl(e.target.value)} placeholder={props.urlPlaceholder} />
-          {props.urlHint && <div style={{ fontSize: 11, color: '#555', marginTop: 5 }}>{props.urlHint}</div>}
+          {props.urlHint && <div style={{ fontSize: 11, color: 'var(--color-text-dim)', marginTop: 5 }}>{props.urlHint}</div>}
           {props.chType === 'webhook' && <div style={{ marginTop: 8 }}><WebhookPayloadPreview /></div>}
         </div>
 
         {/* Down message */}
-        <div style={{ background: '#161616', border: '1px solid #222', borderRadius: 8, padding: '12px 14px' }}>
+        <div style={{ background: 'var(--color-input-bg)', border: '1px solid var(--color-border-muted)', borderRadius: 8, padding: '12px 14px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#e53e3e', flexShrink: 0 }} />
-              <label style={{ ...labelStyle, marginBottom: 0, color: '#e8e8e8' }}>Message when Down</label>
+              <label style={{ ...labelStyle, marginBottom: 0, color: 'var(--color-text)' }}>Message when Down</label>
             </div>
             {props.withTest && (
               <TestButton
@@ -330,11 +332,11 @@ function WebhookChannelForm(props: WebhookFormProps) {
         </div>
 
         {/* Recovery message */}
-        <div style={{ background: '#161616', border: '1px solid #222', borderRadius: 8, padding: '12px 14px' }}>
+        <div style={{ background: 'var(--color-input-bg)', border: '1px solid var(--color-border-muted)', borderRadius: 8, padding: '12px 14px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#48bb78', flexShrink: 0 }} />
-              <label style={{ ...labelStyle, marginBottom: 0, color: '#e8e8e8' }}>Message when Recovered</label>
+              <label style={{ ...labelStyle, marginBottom: 0, color: 'var(--color-text)' }}>Message when Recovered</label>
             </div>
             {props.withTest && (
               <TestButton
@@ -379,8 +381,8 @@ export default function Notifications() {
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 600, color: '#e8e8e8', marginBottom: 2 }}>Notifications</h1>
-        <p style={{ fontSize: 12, color: '#555' }}>Configure how and where you get alerted when a monitor changes status</p>
+        <h1 style={{ fontSize: 20, fontWeight: 600, color: 'var(--color-text)', marginBottom: 2 }}>Notifications</h1>
+        <p style={{ fontSize: 12, color: 'var(--color-text-dim)' }}>Configure how and where you get alerted when a monitor changes status</p>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 720 }}>

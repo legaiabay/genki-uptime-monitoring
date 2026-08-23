@@ -31,9 +31,10 @@ Genki is a self-hosted uptime and healthcheck monitoring application. It checks 
 | TanStack Query v5 | Server state, caching, refetch |
 | React Router v6 | Client-side routing |
 | Recharts | Charts (uptime time-series) |
-| Zustand | Client-only UI state |
+| Zustand | Client-only UI state (+ `persist` middleware for theme) |
 | Axios | HTTP client (singleton in `web/src/lib/api.ts`) |
 | Lucide React | Icon set |
+| boring-avatars | Generated user avatars (beam variant) |
 
 ### Database
 
@@ -62,11 +63,12 @@ genki-uptime-monitoring/
 │   │   │   ├── apikey.go                # CRUD /api-keys + LookupAPIKey helper
 │   │   │   ├── applog.go                # GET /logs — snapshot from ring buffer
 │   │   │   ├── auth.go                  # POST /auth/login, /auth/register, /auth/reset-password
-│   │   │   ├── monitor.go               # CRUD + /logs + /visibility + /groups
+│   │   │   ├── monitor.go               # CRUD + /logs + /visibility + /groups + /favorite + /bulk
+│   │   │   ├── grouplabel.go            # GET/PUT/DELETE /settings/groups + /settings/labels
 │   │   │   ├── incident.go              # List/Get/Update incidents
 │   │   │   ├── heartbeat.go             # List + public Push endpoint
 │   │   │   ├── stats.go                 # GET /stats/overview
-│   │   │   ├── uptime_series.go         # GET /stats/uptime-series?range=
+│   │   │   ├── uptime_series.go         # GET /stats/uptime-series?range=&favorites_only=
 │   │   │   ├── notification.go          # CRUD notification_channels
 │   │   │   ├── public.go                # GET /public/status, /public/status/group/:slug, /public/groups
 │   │   │   ├── profile.go               # GET/PUT /profile, POST /profile/password
@@ -86,7 +88,8 @@ genki-uptime-monitoring/
 │   │       ├── 00004_fix_notification_unique.sql
 │   │       ├── 00005_app_settings.sql   # app_settings key-value table
 │   │       ├── 00006_incidents_soft_fk.sql     # incidents.monitor_id SET NULL on delete
-│   │       └── 00007_monitor_groups_labels.sql # monitors.group_name + labels TEXT[]
+│   │       ├── 00007_monitor_groups_labels.sql # monitors.group_name + labels TEXT[]
+│   │       └── 00008_add_monitor_favorite.sql  # monitors.favorite BOOLEAN
 │   ├── models/                          # Plain Go structs matching DB schema
 │   ├── notifier/
 │   │   ├── notifier.go                  # Payload, Notifier interface, GoogleChat/Telegram/Slack/Webhook senders
@@ -97,9 +100,11 @@ genki-uptime-monitoring/
 │   ├── .env.example                     # Template for web/.env
 │   └── src/
 │       ├── components/
-│       │   ├── layout/                  # Sidebar, Layout
-│       │   └── ui/                      # Card, StatusBadge, MiniSparkline, UptimeBars, NextCheckBar
-│       ├── hooks/                       # useMonitors (+ useGroups), useIncidents, useHeartbeats,
+│       │   ├── layout/                  # Sidebar (theme toggle + user avatar), Layout
+│       │   ├── settings/                # Settings tab components (GroupsLabelsTab)
+│       │   └── ui/                      # Card, StatusBadge, MiniSparkline, UptimeBars, NextCheckBar, UserAvatar
+│       ├── hooks/                       # useMonitors (+ useGroups, useToggleFavorite, useBulkUpdateMonitors),
+│       │   │                            # useGroupsLabels, useIncidents, useHeartbeats,
 │       │   │                            # useProfile, useNotifications, useUptimeSeries,
 │       │   │                            # useOverviewStats, usePublicStatus (+ useGroupPublicStatus,
 │       │   │                            # usePublicGroups), useSiteTitle, useApiKeys,
@@ -109,7 +114,8 @@ genki-uptime-monitoring/
 │       │   │                            # Notifications, Settings, Login, Setup,
 │       │   │                            # ForgotPassword, PublicStatus, GroupPublicStatus
 │       ├── store/                       # Zustand stores (UI state)
-│       ├── types/index.ts               # Shared TypeScript types (Monitor has group_name, labels)
+│       │   └── themeStore.ts            # light/dark theme, persisted to localStorage
+│       ├── types/index.ts               # Shared TypeScript types (Monitor has group_name, labels, favorite)
 │       └── App.tsx                      # QueryClient, BrowserRouter, routes
 ├── docker-compose.yml                   # Production: app + postgres
 ├── docker-compose.dev.yml              # Development: postgres only
@@ -147,17 +153,25 @@ All protected endpoints accept `Authorization: Bearer <jwt>` **or** `Authorizati
 | POST | `/api/v1/profile/password` | Change password |
 | GET/PUT | `/api/v1/settings/general` | App-wide settings (site_name, timezone, etc.) |
 | GET/PATCH | `/api/v1/settings/show-url` | Get/toggle whether monitor URLs show on public pages |
-| GET | `/api/v1/monitors` | List monitors (ordered by group_name, then created_at) |
+| GET | `/api/v1/settings/groups` | List distinct group names with monitor counts |
+| PUT | `/api/v1/settings/groups/:name` | Rename group across all monitors |
+| DELETE | `/api/v1/settings/groups/:name` | Remove group from all monitors |
+| GET | `/api/v1/settings/labels` | List distinct labels with usage counts |
+| PUT | `/api/v1/settings/labels/:name` | Rename label across all monitors |
+| DELETE | `/api/v1/settings/labels/:name` | Remove label from all monitors |
+| GET | `/api/v1/monitors` | List monitors (ordered by favorite DESC, group_name, created_at) |
 | POST | `/api/v1/monitors` | Create monitor |
 | GET | `/api/v1/monitors/groups` | List distinct group names |
+| PATCH | `/api/v1/monitors/bulk` | Bulk update multiple monitors |
 | GET/PUT/DELETE | `/api/v1/monitors/:id` | Get, update, delete |
 | GET | `/api/v1/monitors/:id/logs` | Check history |
 | PATCH | `/api/v1/monitors/:id/visibility` | Toggle public flag |
+| PATCH | `/api/v1/monitors/:id/favorite` | Toggle favorite flag |
 | GET | `/api/v1/incidents` | List incidents |
 | GET/PUT | `/api/v1/incidents/:id` | Incident management |
 | GET | `/api/v1/heartbeats` | List heartbeats |
 | GET | `/api/v1/stats/overview` | Dashboard stats |
-| GET | `/api/v1/stats/uptime-series?range=` | Time-series uptime (1h/6h/24h/7d/30d) |
+| GET | `/api/v1/stats/uptime-series?range=` | Time-series uptime (1h/6h/24h/7d/30d); add `&favorites_only=true` to filter |
 | GET/POST | `/api/v1/notifications` | List/upsert notification channels |
 | DELETE | `/api/v1/notifications/:id` | Remove channel |
 | PATCH | `/api/v1/notifications/:id/enabled` | Toggle channel on/off |
@@ -165,7 +179,7 @@ All protected endpoints accept `Authorization: Bearer <jwt>` **or** `Authorizati
 | POST | `/api/v1/api-keys` | Generate new API key (full key returned once) |
 | DELETE | `/api/v1/api-keys/:id` | Revoke API key |
 
-> **Route ordering note:** `/api/v1/monitors/groups` must be registered **before** `/api/v1/monitors/:id`, and `/api/v1/public/status/group/:groupSlug` must be registered **before** `/api/v1/public/status/:slug`, to prevent Echo from matching the literal path segment as a parameter.
+> **Route ordering note:** `/api/v1/monitors/groups` and `/api/v1/monitors/bulk` must be registered **before** `/api/v1/monitors/:id`, and `/api/v1/public/status/group/:groupSlug` must be registered **before** `/api/v1/public/status/:slug`, to prevent Echo from matching the literal path segment as a parameter.
 
 ---
 
@@ -221,6 +235,7 @@ Only used by the Vite dev server — has no effect on production builds.
 - `api_keys.key` is UNIQUE; keys start with `gk_` followed by 64 hex chars
 - `monitors.group_name` — free-text group name, defaults to `''`; slugified (lowercase, spaces→hyphens) for use in public page URLs
 - `monitors.labels` — `TEXT[]` PostgreSQL array; use `pq.StringArray` / `pq.Array()` in Go
+- `monitors.favorite` — `BOOLEAN NOT NULL DEFAULT FALSE`; controls list ordering and uptime chart filter
 
 ---
 
@@ -230,6 +245,7 @@ Only used by the Vite dev server — has no effect on production builds.
 
 - `group_name VARCHAR(100)` — optional group assignment per monitor
 - `labels TEXT[]` — zero or more short tags per monitor
+- `favorite BOOLEAN` — pins monitor to list top; filters uptime chart on Overview
 
 ### URL slugs for group pages
 
@@ -240,8 +256,10 @@ Group names are slugified on the fly: lowercase + spaces replaced with hyphens. 
 - Monitors page shows a **grouped view** (default) with collapsible group sections and an **inline group status summary** (up/down counts)
 - **Sidebar filters**: click any group or label to filter; active filters show as dismissible badges in the toolbar
 - **Search** matches name, URL, group name, and labels
+- **Bulk edit**: checkbox column on the monitor table; select any set and apply shared fields via the Bulk Edit modal — only enabled fields are sent in the request
 - `MonitorModal` has a group autocomplete input (shows existing groups, allows creating new ones inline) and a labels tag input (Enter or comma to add, Backspace to remove)
 - `NextCheckBar` shows **yellow** when the monitor is actively being checked (countdown reached zero), green otherwise
+- **Groups & Labels manager**: Settings → Groups & Labels — rename or delete a group/label globally; shows monitor count per entry
 
 ### Public status pages
 
@@ -270,7 +288,7 @@ Each channel config (stored as JSONB) supports:
 - `recovery_message` — template for recovery events
 - `custom_message` — legacy fallback (single template)
 
-Template variables: `{{monitor_name}}`, `{{monitor_url}}`, `{{status}}`, `{{response_time}}`, `{{error_message}}`, `{{checked_at}}`
+Template variables: `{{monitor_name}}`, `{{monitor_url}}`, `{{status}}`, `{{response_time}}`, `{{error_message}}`, `{{checked_at}}`, `{{downtime_duration}}` (recovery only)
 
 Notifications are dispatched as goroutines by `notifier.Dispatcher` when:
 - Monitor status transitions to `down` (was not already down)
@@ -358,6 +376,17 @@ The Dockerfile uses a 3-stage build:
 - `useAppLogs` hook: fetches snapshot on mount (stale-time: Infinity), opens WS, appends live entries; caps local list at 500
 - **WS auth**: browsers cannot send `Authorization` headers during WebSocket upgrade — token is passed as `?token=<jwt>` query param; JWT middleware reads it as fallback when the header is absent
 - Settings → Logs tab features: live/disconnected badge, entry count, message search, level filter, pause/resume auto-scroll, download `.txt`, clear view
+
+---
+
+## Theme
+
+- Light/dark mode toggle in the sidebar footer; defaults to dark
+- `web/src/store/themeStore.ts` — Zustand store with `persist` middleware; key `genki-theme` in `localStorage`
+- `index.css` has a `html.light { … }` block overriding all CSS variables for light mode
+- `Layout.tsx` applies the `light` class to `<html>` when `theme === 'light'`
+- Sidebar logo swaps between `logo.png` (dark) and `logo-dark.png` (light)
+- `UserAvatar` (boring-avatars `beam` variant) rendered in the sidebar next to the user's display name
 
 ---
 

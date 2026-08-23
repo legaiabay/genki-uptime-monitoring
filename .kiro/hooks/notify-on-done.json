@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Notify When Done",
+      "trigger": "Stop",
+      "description": "Kirim macOS notification setiap kali agent selesai jalan",
+      "action": {
+        "type": "command",
+        "command": "osascript -e 'display notification \"Kiro selesai ngerjain task kamu\" with title \"Kiro ✅\" sound name \"Glass\"'"
+      }
+    }
+  ]
+}

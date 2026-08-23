@@ -1,29 +1,34 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, User, Key, Globe, Loader2, AlertCircle, Copy, Trash2, Plus, CheckCheck, BookOpen, Terminal, Download, TriangleAlert, ScrollText, Wifi, WifiOff, XCircle } from 'lucide-react'
+import { Check, User, Key, Globe, Loader2, AlertCircle, Copy, Trash2, Plus, CheckCheck, BookOpen, Terminal, Download, TriangleAlert, ScrollText, Wifi, WifiOff, XCircle, FolderOpen } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import api from '@/lib/api'
 import Card from '@/components/ui/Card'
+import UserAvatar from '@/components/ui/UserAvatar'
 import {
   useProfile, useUpdateProfile, useChangePassword,
   useAppSettings, useUpdateAppSettings,
 } from '@/hooks/useProfile'
 import { useApiKeys, useCreateApiKey, useDeleteApiKey } from '@/hooks/useApiKeys'
 import { useAppLogs, type LogLevel } from '@/hooks/useAppLogs'
+import GroupsLabelsTab from '@/components/settings/GroupsLabelsTab'
 
-type Tab = 'profile' | 'api-keys' | 'general' | 'logs'
+type Tab = 'general' | 'profile' | 'groups-labels' | 'api-keys' | 'logs' | 'danger-zone'
 
-const tabs: Array<{ value: Tab; label: string; icon: typeof User }> = [
-  { value: 'profile',  label: 'Profile',  icon: User },
-  { value: 'api-keys', label: 'API Keys', icon: Key },
-  { value: 'general',  label: 'General',  icon: Globe },
-  { value: 'logs',     label: 'Logs',     icon: ScrollText },
+const tabs: Array<{ value: Tab; label: string; icon: typeof User; danger?: boolean }> = [
+  { value: 'general',       label: 'General',         icon: Globe },
+  { value: 'profile',       label: 'Profile',         icon: User },
+  { value: 'groups-labels', label: 'Groups & Labels', icon: FolderOpen },
+  { value: 'api-keys',      label: 'API Keys',        icon: Key },
+  { value: 'logs',          label: 'Logs',            icon: ScrollText },
+  { value: 'danger-zone',   label: 'Danger Zone',     icon: TriangleAlert, danger: true },
 ]
 
 const inputStyle = {
-  width: '100%', background: '#161616', border: '1px solid #2a2a2a',
-  borderRadius: 6, color: '#e8e8e8', fontSize: 13, padding: '8px 12px', outline: 'none',
+  width: '100%', background: 'var(--color-input-bg)', border: '1px solid var(--color-border)',
+  borderRadius: 6, color: 'var(--color-text)', fontSize: 13, padding: '8px 12px', outline: 'none',
 } as const
 
-const labelStyle = { fontSize: 12, color: '#888', display: 'block', marginBottom: 6 } as const
+const labelStyle = { fontSize: 12, color: 'var(--color-text-muted)', display: 'block', marginBottom: 6 } as const
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
@@ -117,34 +122,31 @@ function ProfileTab() {
   }
 
   if (isLoading) {
-    return <div style={{ color: '#555', fontSize: 13, padding: 20 }}>Loading…</div>
+    return <div style={{ color: 'var(--color-text-dim)', fontSize: 13, padding: 20 }}>Loading…</div>
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+      {/* ── Left: Profile Information ── */}
       <Card style={{ padding: '20px' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8', marginBottom: 16 }}>Profile Information</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 16 }}>Profile Information</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Avatar */}
           <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 4 }}>
-            <div style={{ width: 52, height: 52, borderRadius: 12, background: '#e53e3e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
-              {(form.name || profile?.name || '?').charAt(0).toUpperCase()}
-            </div>
+            <UserAvatar name={form.name || profile?.name || '?'} size={52} borderRadius={12} />
             <div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#e8e8e8' }}>{profile?.name}</div>
-              <div style={{ fontSize: 12, color: '#555', marginTop: 2 }}>{profile?.email} · {profile?.role}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{profile?.name}</div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-dim)', marginTop: 2 }}>{profile?.email} · {profile?.role}</div>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <div>
-              <label style={labelStyle}>Display Name</label>
-              <input style={inputStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-            </div>
-            <div>
-              <label style={labelStyle}>Email Address</label>
-              <input style={inputStyle} value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
-            </div>
+          <div>
+            <label style={labelStyle}>Display Name</label>
+            <input style={inputStyle} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+          </div>
+          <div>
+            <label style={labelStyle}>Email Address</label>
+            <input style={inputStyle} value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
           </div>
 
           {profileError && <ErrorMsg msg={profileError} />}
@@ -155,8 +157,9 @@ function ProfileTab() {
         </div>
       </Card>
 
+      {/* ── Right: Change Password ── */}
       <Card style={{ padding: '20px' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8', marginBottom: 16 }}>Change Password</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 16 }}>Change Password</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
             <label style={labelStyle}>Current Password</label>
@@ -164,19 +167,17 @@ function ProfileTab() {
               value={pwForm.current_password}
               onChange={e => setPwForm(f => ({ ...f, current_password: e.target.value }))} />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <div>
-              <label style={labelStyle}>New Password</label>
-              <input type="password" style={inputStyle} placeholder="Min. 8 characters"
-                value={pwForm.new_password}
-                onChange={e => setPwForm(f => ({ ...f, new_password: e.target.value }))} />
-            </div>
-            <div>
-              <label style={labelStyle}>Confirm Password</label>
-              <input type="password" style={inputStyle} placeholder="••••••••"
-                value={pwForm.confirm_password}
-                onChange={e => setPwForm(f => ({ ...f, confirm_password: e.target.value }))} />
-            </div>
+          <div>
+            <label style={labelStyle}>New Password</label>
+            <input type="password" style={inputStyle} placeholder="Min. 8 characters"
+              value={pwForm.new_password}
+              onChange={e => setPwForm(f => ({ ...f, new_password: e.target.value }))} />
+          </div>
+          <div>
+            <label style={labelStyle}>Confirm Password</label>
+            <input type="password" style={inputStyle} placeholder="••••••••"
+              value={pwForm.confirm_password}
+              onChange={e => setPwForm(f => ({ ...f, confirm_password: e.target.value }))} />
           </div>
 
           {pwError && <ErrorMsg msg={pwError} />}
@@ -352,8 +353,8 @@ function GenerateModal({ onClose, onCreated }: { onClose: () => void; onCreated:
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
     }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 10, padding: 24, width: 400, maxWidth: '90vw' }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#e8e8e8', marginBottom: 16 }}>Generate API Key</div>
+      <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 24, width: 400, maxWidth: '90vw' }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 16 }}>Generate API Key</div>
         <div style={{ marginBottom: 14 }}>
           <label style={labelStyle}>Key Name</label>
           <input
@@ -367,7 +368,7 @@ function GenerateModal({ onClose, onCreated }: { onClose: () => void; onCreated:
         </div>
         {error && <ErrorMsg msg={error} />}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-          <button onClick={onClose} style={{ background: 'none', border: '1px solid #2a2a2a', borderRadius: 6, color: '#888', fontSize: 13, padding: '7px 16px', cursor: 'pointer' }}>
+          <button onClick={onClose} style={{ background: 'none', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 13, padding: '7px 16px', cursor: 'pointer' }}>
             Cancel
           </button>
           <button onClick={handleSubmit} disabled={createKey.isPending} style={{
@@ -390,19 +391,19 @@ function NewKeyModal({ rawKey, onClose }: { rawKey: string; onClose: () => void 
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
     }}>
-      <div style={{ background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 10, padding: 24, width: 480, maxWidth: '90vw' }}>
+      <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 24, width: 480, maxWidth: '90vw' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <Check size={16} color="#68d391" />
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#e8e8e8' }}>API key generated</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>API key generated</span>
         </div>
-        <p style={{ fontSize: 12, color: '#888', marginBottom: 14, lineHeight: 1.5 }}>
+        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 14, lineHeight: 1.5 }}>
           Copy your key now — it won't be shown again after you close this dialog.
         </p>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
-          background: '#0e0e0e', border: '1px solid #2a2a2a', borderRadius: 6, padding: '10px 12px',
+          background: 'var(--color-bg-deep)', border: '1px solid var(--color-border)', borderRadius: 6, padding: '10px 12px',
         }}>
-          <code style={{ flex: 1, fontSize: 12, color: '#a8d8a8', wordBreak: 'break-all' }}>{rawKey}</code>
+          <code style={{ flex: 1, fontSize: 12, color: 'var(--color-up)', wordBreak: 'break-all' }}>{rawKey}</code>
           <CopyButton text={rawKey} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
@@ -563,8 +564,8 @@ public class Main {
       <Card style={{ padding: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8' }}>API Keys</div>
-            <div style={{ fontSize: 12, color: '#555', marginTop: 2 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>API Keys</div>
+            <div style={{ fontSize: 12, color: 'var(--color-text-dim)', marginTop: 2 }}>
               Keys authenticate API requests in place of your session token.
             </div>
           </div>
@@ -577,11 +578,11 @@ public class Main {
         </div>
 
         {isLoading ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#555', fontSize: 13, padding: '16px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-text-dim)', fontSize: 13, padding: '16px 0' }}>
             <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Loading…
           </div>
         ) : keys.length === 0 ? (
-          <div style={{ fontSize: 13, color: '#555', padding: '24px 0', textAlign: 'center' }}>
+          <div style={{ fontSize: 13, color: 'var(--color-text-dim)', padding: '24px 0', textAlign: 'center' }}>
             No API keys yet. Generate one to get started.
           </div>
         ) : (
@@ -589,27 +590,27 @@ public class Main {
             <thead>
               <tr>
                 {['Name', 'Key', 'Created', 'Last Used', ''].map(h => (
-                  <th key={h} style={{ padding: '8px 0', textAlign: 'left', fontSize: 11, color: '#555', fontWeight: 500, borderBottom: '1px solid #222' }}>{h}</th>
+                  <th key={h} style={{ padding: '8px 0', textAlign: 'left', fontSize: 11, color: 'var(--color-text-dim)', fontWeight: 500, borderBottom: '1px solid var(--color-border-muted)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {keys.map((k, idx) => (
-                <tr key={k.id} style={{ borderBottom: idx < keys.length - 1 ? '1px solid #1a1a1a' : 'none' }}>
-                  <td style={{ padding: '11px 0', fontSize: 13, color: '#e8e8e8', paddingRight: 12 }}>{k.name}</td>
+                <tr key={k.id} style={{ borderBottom: idx < keys.length - 1 ? '1px solid var(--color-row-divider)' : 'none' }}>
+                  <td style={{ padding: '11px 0', fontSize: 13, color: 'var(--color-text)', paddingRight: 12 }}>{k.name}</td>
                   <td style={{ padding: '11px 0', paddingRight: 12 }}>
-                    <code style={{ fontSize: 12, color: '#888', background: '#161616', padding: '3px 8px', borderRadius: 4 }}>
+                    <code style={{ fontSize: 12, color: 'var(--color-text-muted)', background: 'var(--color-input-bg)', padding: '3px 8px', borderRadius: 4 }}>
                       {k.key_prefix}
                     </code>
                   </td>
-                  <td style={{ padding: '11px 0', fontSize: 12, color: '#555', paddingRight: 12, whiteSpace: 'nowrap' }}>{fmt(k.created_at)}</td>
-                  <td style={{ padding: '11px 0', fontSize: 12, color: '#555', paddingRight: 12, whiteSpace: 'nowrap' }}>{fmt(k.last_used)}</td>
+                  <td style={{ padding: '11px 0', fontSize: 12, color: 'var(--color-text-dim)', paddingRight: 12, whiteSpace: 'nowrap' }}>{fmt(k.created_at)}</td>
+                  <td style={{ padding: '11px 0', fontSize: 12, color: 'var(--color-text-dim)', paddingRight: 12, whiteSpace: 'nowrap' }}>{fmt(k.last_used)}</td>
                   <td style={{ padding: '11px 0', textAlign: 'right' }}>
                     <button
                       onClick={() => handleRevoke(k.id)}
                       disabled={revoking === k.id}
                       title="Revoke key"
-                      style={{ background: 'none', border: 'none', color: '#555', cursor: revoking === k.id ? 'not-allowed' : 'pointer', padding: '2px 4px', borderRadius: 4, display: 'inline-flex', alignItems: 'center' }}
+                      style={{ background: 'none', border: 'none', color: 'var(--color-text-dim)', cursor: revoking === k.id ? 'not-allowed' : 'pointer', padding: '2px 4px', borderRadius: 4, display: 'inline-flex', alignItems: 'center' }}
                     >
                       {revoking === k.id
                         ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
@@ -627,17 +628,17 @@ public class Main {
       <Card style={{ padding: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
           <Download size={14} color="#e53e3e" />
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8' }}>Download Collections</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Download Collections</div>
         </div>
-        <p style={{ fontSize: 12, color: '#555', marginBottom: 20, lineHeight: 1.6 }}>
+        <p style={{ fontSize: 12, color: 'var(--color-text-dim)', marginBottom: 20, lineHeight: 1.6 }}>
           Import this collection into your API client to start testing immediately.
           The collection includes all endpoints pre-configured with Bearer token auth —
-          just replace <code style={{ color: '#888', background: '#161616', padding: '1px 6px', borderRadius: 3, fontSize: 11 }}>apiKey</code> with your key in the environment.
+          just replace <code style={{ color: 'var(--color-text-muted)', background: 'var(--color-input-bg)', padding: '1px 6px', borderRadius: 3, fontSize: 11 }}>apiKey</code> with your key in the environment.
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           {/* Postman */}
-          <div style={{ background: '#0e0e0e', border: '1px solid #1e1e1e', borderRadius: 8, padding: '16px' }}>
+          <div style={{ background: 'var(--color-bg-deep)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, padding: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
               {/* Postman orange "P" logo mark */}
               <div style={{
@@ -646,11 +647,11 @@ public class Main {
                 fontWeight: 800, fontSize: 13, color: '#fff', fontFamily: 'serif',
               }}>P</div>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8' }}>Postman</div>
-                <div style={{ fontSize: 11, color: '#555' }}>Collection v2.1</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Postman</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-dim)' }}>Collection v2.1</div>
               </div>
             </div>
-            <p style={{ fontSize: 12, color: '#666', marginBottom: 14, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 14, lineHeight: 1.5 }}>
               Import into Postman via <em>File → Import</em>. An environment with <code style={{ fontSize: 11 }}>baseUrl</code> and <code style={{ fontSize: 11 }}>apiKey</code> is bundled inside the file.
             </p>
             <button
@@ -669,7 +670,7 @@ public class Main {
           </div>
 
           {/* Bruno */}
-          <div style={{ background: '#0e0e0e', border: '1px solid #1e1e1e', borderRadius: 8, padding: '16px' }}>
+          <div style={{ background: 'var(--color-bg-deep)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, padding: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
               {/* Bruno golden "B" logo mark */}
               <div style={{
@@ -678,11 +679,11 @@ public class Main {
                 fontWeight: 800, fontSize: 13, color: '#fff', fontFamily: 'serif',
               }}>B</div>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8' }}>Bruno</div>
-                <div style={{ fontSize: 11, color: '#555' }}>OpenCollection format</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Bruno</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-dim)' }}>OpenCollection format</div>
               </div>
             </div>
-            <p style={{ fontSize: 12, color: '#666', marginBottom: 14, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 14, lineHeight: 1.5 }}>
               Import into Bruno via <em>+ → Import Collection</em>. Contains a Default environment with <code style={{ fontSize: 11 }}>baseUrl</code> and <code style={{ fontSize: 11 }}>apiKey</code>.
             </p>
             <button
@@ -706,30 +707,30 @@ public class Main {
       <Card style={{ padding: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
           <BookOpen size={14} color="#e53e3e" />
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8' }}>API Reference</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>API Reference</div>
         </div>
-        <p style={{ fontSize: 12, color: '#555', marginBottom: 20, lineHeight: 1.6 }}>
+        <p style={{ fontSize: 12, color: 'var(--color-text-dim)', marginBottom: 20, lineHeight: 1.6 }}>
           All protected endpoints accept either a session JWT or an API key as a Bearer token.
-          The base URL is <code style={{ color: '#888', background: '#161616', padding: '1px 6px', borderRadius: 3, fontSize: 11 }}>{baseUrl}</code>.
+          The base URL is <code style={{ color: 'var(--color-text-muted)', background: 'var(--color-input-bg)', padding: '1px 6px', borderRadius: 3, fontSize: 11 }}>{baseUrl}</code>.
         </p>
 
         {/* Authentication snippet */}
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             <Terminal size={13} color="#888" />
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Authentication</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Authentication</span>
           </div>
-          <div style={{ background: '#0e0e0e', border: '1px solid #222', borderRadius: 8, overflow: 'hidden' }}>
+          <div style={{ background: 'var(--color-bg-deep)', border: '1px solid var(--color-border-muted)', borderRadius: 8, overflow: 'hidden' }}>
             {/* tab bar */}
-            <div style={{ display: 'flex', borderBottom: '1px solid #1e1e1e', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border-subtle)', flexWrap: 'wrap' }}>
               {(['curl', 'js', 'python', 'go', 'php', 'ruby', 'java'] as const).map(t => (
                 <button
                   key={t}
                   onClick={() => setCodeTab(t)}
                   style={{
-                    background: codeTab === t ? '#161616' : 'none',
-                    border: 'none', borderRight: '1px solid #1e1e1e',
-                    color: codeTab === t ? '#e8e8e8' : '#555',
+                    background: codeTab === t ? 'var(--color-surface-2)' : 'none',
+                    border: 'none', borderRight: '1px solid var(--color-border-subtle)',
+                    color: codeTab === t ? 'var(--color-text)' : 'var(--color-text-dim)',
                     fontSize: 11, padding: '7px 14px', cursor: 'pointer',
                     fontWeight: codeTab === t ? 500 : 400,
                     whiteSpace: 'nowrap',
@@ -741,7 +742,7 @@ public class Main {
               <div style={{ flex: 1 }} />
               <CopyButton text={codeMap[codeTab]} />
             </div>
-            <pre style={{ margin: 0, padding: '14px 16px', fontSize: 12, color: '#a8d8a8', overflowX: 'auto', lineHeight: 1.6 }}>
+            <pre style={{ margin: 0, padding: '14px 16px', fontSize: 12, color: 'var(--color-up)', overflowX: 'auto', lineHeight: 1.6 }}>
               <code>{codeMap[codeTab]}</code>
             </pre>
           </div>
@@ -749,18 +750,18 @@ public class Main {
 
         {/* Endpoints table */}
         <div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
             Available Endpoints
           </div>
-          <div style={{ border: '1px solid #1e1e1e', borderRadius: 8, overflow: 'hidden' }}>
+          <div style={{ border: '1px solid var(--color-border-subtle)', borderRadius: 8, overflow: 'hidden' }}>
             {endpoints.map((ep, idx) => (
               <div
                 key={idx}
                 style={{
                   display: 'grid', gridTemplateColumns: '64px 1fr auto',
                   alignItems: 'center', gap: 12, padding: '9px 14px',
-                  borderBottom: idx < endpoints.length - 1 ? '1px solid #161616' : 'none',
-                  background: idx % 2 === 0 ? 'transparent' : '#0e0e0e',
+                  borderBottom: idx < endpoints.length - 1 ? '1px solid var(--color-row-divider)' : 'none',
+                  background: idx % 2 === 0 ? 'transparent' : 'var(--color-bg-deep)',
                 }}
               >
                 <span style={{
@@ -770,8 +771,8 @@ public class Main {
                 }}>
                   {ep.method}
                 </span>
-                <code style={{ fontSize: 12, color: '#888' }}>{ep.path}</code>
-                <span style={{ fontSize: 12, color: '#555', textAlign: 'right' }}>{ep.desc}</span>
+                <code style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{ep.path}</code>
+                <span style={{ fontSize: 12, color: 'var(--color-text-dim)', textAlign: 'right' }}>{ep.desc}</span>
               </div>
             ))}
           </div>
@@ -840,15 +841,15 @@ function ResetConfirmModal({ scope, onClose, onConfirm, busy }: {
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
     }} onClick={e => { if (!busy && e.target === e.currentTarget) onClose() }}>
-      <div style={{ background: '#1a1a1a', border: '1px solid #3a1a1a', borderRadius: 10, padding: 24, width: 460, maxWidth: '90vw' }}>
+      <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-danger-zone-border)', borderRadius: 10, padding: 24, width: 460, maxWidth: '90vw' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(229,62,62,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <TriangleAlert size={16} color="#e53e3e" />
           </div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#e8e8e8' }}>{cfg.title}</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{cfg.title}</div>
         </div>
 
-        <p style={{ fontSize: 13, color: '#888', lineHeight: 1.6, marginBottom: 16 }}>
+        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.6, marginBottom: 16 }}>
           {cfg.description}
         </p>
 
@@ -870,7 +871,7 @@ function ResetConfirmModal({ scope, onClose, onConfirm, busy }: {
           <button
             onClick={onClose}
             disabled={busy}
-            style={{ background: 'none', border: '1px solid #2a2a2a', borderRadius: 6, color: '#888', fontSize: 13, padding: '7px 16px', cursor: busy ? 'not-allowed' : 'pointer' }}
+            style={{ background: 'none', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 13, padding: '7px 16px', cursor: busy ? 'not-allowed' : 'pointer' }}
           >
             Cancel
           </button>
@@ -909,10 +910,6 @@ function GeneralTab() {
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [saveError, setSaveError] = useState('')
 
-  const [showResetModal, setShowResetModal] = useState<ResetScope | null>(null)
-  const [resetBusy, setResetBusy] = useState(false)
-  const [resetError, setResetError] = useState('')
-
   useEffect(() => {
     if (settings) {
       setForm({
@@ -940,34 +937,14 @@ function GeneralTab() {
     })
   }
 
-  async function handleReset() {
-    if (!showResetModal) return
-    setResetBusy(true)
-    setResetError('')
-    try {
-      if (showResetModal === 'monitoring') {
-        await api.post('/settings/reset-monitoring')
-        setShowResetModal(null)
-        setResetBusy(false)
-      } else {
-        await api.post('/settings/reset-data')
-        localStorage.removeItem('token')
-        window.location.href = '/register'
-      }
-    } catch (err: any) {
-      setResetError(err?.response?.data?.message ?? 'Reset failed')
-      setResetBusy(false)
-    }
-  }
-
   if (isLoading) {
-    return <div style={{ color: '#555', fontSize: 13, padding: 20 }}>Loading…</div>
+    return <div style={{ color: 'var(--color-text-dim)', fontSize: 13, padding: 20 }}>Loading…</div>
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <Card style={{ padding: '20px' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8', marginBottom: 16 }}>General Settings</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 16 }}>General Settings</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
@@ -1008,29 +985,62 @@ function GeneralTab() {
         </div>
       </Card>
 
-      {/* ── Danger Zone ── */}
-      <Card style={{ padding: '20px', border: '1px solid #3a1a1a' }}>
+      {/* ── Danger Zone moved to its own tab ── */}
+    </div>
+  )
+}
+
+// ── Danger Zone tab ───────────────────────────────────────────────────────────
+
+function DangerZoneTab() {
+  const [showResetModal, setShowResetModal] = useState<ResetScope | null>(null)
+  const [resetBusy, setResetBusy] = useState(false)
+  const [resetError, setResetError] = useState('')
+
+  async function handleReset() {
+    if (!showResetModal) return
+    setResetBusy(true)
+    setResetError('')
+    try {
+      if (showResetModal === 'monitoring') {
+        await api.post('/settings/reset-monitoring')
+        setShowResetModal(null)
+        setResetBusy(false)
+      } else {
+        await api.post('/settings/reset-data')
+        localStorage.removeItem('token')
+        window.location.href = '/register'
+      }
+    } catch (err: any) {
+      setResetError(err?.response?.data?.message ?? 'Reset failed')
+      setResetBusy(false)
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <Card style={{ padding: '20px', border: '1px solid var(--color-danger-zone-border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
           <TriangleAlert size={14} color="#e53e3e" />
           <div style={{ fontSize: 13, fontWeight: 600, color: '#e53e3e' }}>Danger Zone</div>
         </div>
-        <p style={{ fontSize: 12, color: '#666', marginBottom: 16, lineHeight: 1.6 }}>
+        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 16, lineHeight: 1.6 }}>
           Destructive actions that cannot be reversed. Proceed with extreme caution.
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {/* Row 1 — monitoring data only */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: '#160a0a', border: '1px solid #2a1212', borderRadius: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: 'var(--color-danger-zone-bg)', border: '1px solid var(--color-danger-zone-border)', borderRadius: 8 }}>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 500, color: '#e8e8e8', marginBottom: 3 }}>Reset Monitoring Data</div>
-              <div style={{ fontSize: 12, color: '#666' }}>Delete all monitors, logs, incidents, and heartbeats. Users and settings are preserved.</div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', marginBottom: 3 }}>Reset Monitoring Data</div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Delete all monitors, logs, incidents, and heartbeats. Users and settings are preserved.</div>
             </div>
             <button
               onClick={() => { setResetError(''); setShowResetModal('monitoring') }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 16,
-                background: 'transparent', border: '1px solid #555', borderRadius: 6,
-                color: '#aaa', fontSize: 12, fontWeight: 500, padding: '7px 14px', cursor: 'pointer',
+                background: 'transparent', border: '1px solid var(--color-border-active)', borderRadius: 6,
+                color: 'var(--color-text-muted)', fontSize: 12, fontWeight: 500, padding: '7px 14px', cursor: 'pointer',
               }}
             >
               <Trash2 size={13} /> Reset Monitoring
@@ -1038,10 +1048,10 @@ function GeneralTab() {
           </div>
 
           {/* Row 2 — everything including users */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: '#160a0a', border: '1px solid #2a1212', borderRadius: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: 'var(--color-danger-zone-bg)', border: '1px solid var(--color-danger-zone-border)', borderRadius: 8 }}>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 500, color: '#e8e8e8', marginBottom: 3 }}>Reset All Data</div>
-              <div style={{ fontSize: 12, color: '#666' }}>Delete everything including users and settings. App returns to first-boot state, you will be logged out.</div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', marginBottom: 3 }}>Reset All Data</div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Delete everything including users and settings. App returns to first-boot state, you will be logged out.</div>
             </div>
             <button
               onClick={() => { setResetError(''); setShowResetModal('all') }}
@@ -1137,13 +1147,13 @@ function LogsTab() {
           </div>
 
           {/* Entry count */}
-          <span style={{ fontSize: 11, color: '#555' }}>{visible.length} / {entries.length} entries</span>
+          <span style={{ fontSize: 11, color: 'var(--color-text-dim)' }}>{visible.length} / {entries.length} entries</span>
 
           <div style={{ flex: 1 }} />
 
           {/* Search */}
           <input
-            style={{ background: '#161616', border: '1px solid #2a2a2a', borderRadius: 6, color: '#e8e8e8', fontSize: 12, padding: '5px 10px', width: 180, outline: 'none' }}
+            style={{ background: 'var(--color-input-bg)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text)', fontSize: 12, padding: '5px 10px', width: 180, outline: 'none' }}
             placeholder="Search messages…"
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -1153,7 +1163,7 @@ function LogsTab() {
           {/* Level filter — wrapper needed to position custom arrow */}
           <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
             <select
-              style={{ background: '#161616', border: '1px solid #2a2a2a', borderRadius: 6, color: '#e8e8e8', fontSize: 12, padding: '5px 32px 5px 10px', outline: 'none', cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}
+              style={{ background: 'var(--color-input-bg)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text)', fontSize: 12, padding: '5px 32px 5px 10px', outline: 'none', cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none' }}
               value={filter}
               onChange={e => setFilter(e.target.value as LogLevel | 'all')}
             >
@@ -1163,7 +1173,7 @@ function LogsTab() {
               <option value="error">Error</option>
               <option value="debug">Debug</option>
             </select>
-            <svg style={{ position: 'absolute', right: 9, pointerEvents: 'none', color: '#666' }} width="11" height="11" viewBox="0 0 12 12" fill="none">
+            <svg style={{ position: 'absolute', right: 9, pointerEvents: 'none', color: 'var(--color-text-muted)' }} width="11" height="11" viewBox="0 0 12 12" fill="none">
               <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
@@ -1181,7 +1191,7 @@ function LogsTab() {
           <button
             onClick={downloadLogs}
             title="Download logs as .txt"
-            style={{ background: '#161616', border: '1px solid #2a2a2a', borderRadius: 6, color: '#555', padding: '5px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+            style={{ background: 'var(--color-input-bg)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-dim)', padding: '5px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
           >
             <Download size={13} />
           </button>
@@ -1190,7 +1200,7 @@ function LogsTab() {
           <button
             onClick={clear}
             title="Clear log view"
-            style={{ background: '#161616', border: '1px solid #2a2a2a', borderRadius: 6, color: '#555', padding: '5px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+            style={{ background: 'var(--color-input-bg)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-dim)', padding: '5px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
           >
             <XCircle size={13} />
           </button>
@@ -1199,23 +1209,23 @@ function LogsTab() {
         {/* ── Log output ── */}
         <div
           ref={containerRef}
-          style={{ background: '#0a0a0a', border: '1px solid #1e1e1e', borderRadius: 8, height: 480, overflowY: 'auto', fontFamily: 'monospace', fontSize: 12 }}
+          style={{ background: 'var(--color-log-bg)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, height: 480, overflowY: 'auto', fontFamily: 'monospace', fontSize: 12 }}
         >
           {isLoading ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#555', padding: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-text-dim)', padding: 16 }}>
               <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Loading…
             </div>
           ) : visible.length === 0 ? (
-            <div style={{ color: '#333', padding: 16 }}>No log entries{search || filter !== 'all' ? ' matching filters' : ''}.</div>
+            <div style={{ color: 'var(--color-text-faint)', padding: 16 }}>No log entries{search || filter !== 'all' ? ' matching filters' : ''}.</div>
           ) : (
             visible.map((e, i) => (
               <div
                 key={i}
-                style={{ display: 'flex', gap: 10, padding: '3px 12px', borderBottom: '1px solid #111', alignItems: 'flex-start' }}
+                style={{ display: 'flex', gap: 10, padding: '3px 12px', borderBottom: '1px solid var(--color-row-divider)', alignItems: 'flex-start' }}
               >
-                <span style={{ color: '#555', flexShrink: 0, userSelect: 'none', paddingTop: 1 }}>{fmt(e.timestamp)}</span>
+                <span style={{ color: 'var(--color-text-dim)', flexShrink: 0, userSelect: 'none', paddingTop: 1 }}>{fmt(e.timestamp)}</span>
                 <span style={{ color: LEVEL_COLOR[e.level], flexShrink: 0, width: 40, textTransform: 'uppercase', fontSize: 10, fontWeight: 700, paddingTop: 2 }}>{e.level}</span>
-                <span style={{ color: '#c8c8c8', wordBreak: 'break-word', lineHeight: 1.5 }}>{e.message}</span>
+                <span style={{ color: 'var(--color-text-secondary)', wordBreak: 'break-word', lineHeight: 1.5 }}>{e.message}</span>
               </div>
             ))
           )}
@@ -1229,48 +1239,71 @@ function LogsTab() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState<Tab>('profile')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab') as Tab | null
+  const validTabs = tabs.map(t => t.value)
+  const [activeTab, setActiveTab] = useState<Tab>(
+    tabParam && validTabs.includes(tabParam) ? tabParam : 'general'
+  )
+
+  function handleTabChange(tab: Tab) {
+    setActiveTab(tab)
+    setSearchParams({ tab }, { replace: true })
+  }
 
   return (
     <div style={{ padding: '20px 24px' }}>
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 20, fontWeight: 600, color: '#e8e8e8', marginBottom: 2 }}>Settings</h1>
-        <p style={{ fontSize: 12, color: '#555' }}>Manage your account and preferences</p>
+        <h1 style={{ fontSize: 20, fontWeight: 600, color: 'var(--color-text)', marginBottom: 2 }}>Settings</h1>
+        <p style={{ fontSize: 12, color: 'var(--color-text-dim)' }}>Manage your account and preferences</p>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 20 }}>
         {/* sidebar nav */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {tabs.map(tab => {
+          {tabs.map((tab, idx) => {
             const Icon = tab.icon
             const active = activeTab === tab.value
+            const isFirst = idx === 0
+            const prevDanger = idx > 0 && tabs[idx - 1].danger
+            const showSeparator = tab.danger && !prevDanger
             return (
-              <button
-                key={tab.value}
-                onClick={() => setActiveTab(tab.value)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '9px 12px', borderRadius: 6, border: 'none',
-                  background: active ? '#252525' : 'transparent',
-                  color: active ? '#e8e8e8' : '#666',
-                  fontSize: 13, fontWeight: active ? 500 : 400,
-                  cursor: 'pointer', textAlign: 'left',
-                  transition: 'background 0.1s, color 0.1s',
-                }}
-              >
-                <Icon size={14} strokeWidth={1.8} />
-                {tab.label}
-              </button>
+              <div key={tab.value}>
+                {showSeparator && (
+                  <div style={{ height: 1, background: 'var(--color-border)', margin: '6px 0' }} />
+                )}
+                <button
+                  onClick={() => handleTabChange(tab.value)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '9px 12px', borderRadius: 6, border: 'none',
+                    background: active
+                      ? (tab.danger ? 'rgba(229,62,62,0.1)' : 'var(--color-surface-hover)')
+                      : 'transparent',
+                    color: tab.danger
+                      ? (active ? '#e53e3e' : '#e53e3ebb')
+                      : (active ? 'var(--color-text)' : 'var(--color-text-muted)'),
+                    fontSize: 13, fontWeight: active ? 500 : 400,
+                    cursor: 'pointer', textAlign: 'left', width: '100%',
+                    transition: 'background 0.1s, color 0.1s',
+                  }}
+                >
+                  <Icon size={14} strokeWidth={1.8} />
+                  {tab.label}
+                </button>
+              </div>
             )
           })}
         </div>
 
         {/* content */}
         <div>
-          {activeTab === 'profile'  && <ProfileTab />}
-          {activeTab === 'api-keys' && <ApiKeysTab />}
-          {activeTab === 'general'  && <GeneralTab />}
-          {activeTab === 'logs'     && <LogsTab />}
+          {activeTab === 'general'       && <GeneralTab />}
+          {activeTab === 'profile'       && <ProfileTab />}
+          {activeTab === 'api-keys'      && <ApiKeysTab />}
+          {activeTab === 'groups-labels' && <GroupsLabelsTab />}
+          {activeTab === 'logs'          && <LogsTab />}
+          {activeTab === 'danger-zone'   && <DangerZoneTab />}
         </div>
       </div>
     </div>

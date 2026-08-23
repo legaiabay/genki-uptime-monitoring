@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
+import { useThemeStore } from '@/store/themeStore'
 import Layout from '@/components/layout/Layout'
 import Overview from '@/pages/Overview'
 import Monitors from '@/pages/Monitors'
@@ -53,7 +54,7 @@ function SetupGuard({ children }: { children: React.ReactNode }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#0d0d0d',
+        background: 'var(--color-bg)',
       }}>
         <div style={{ width: 24, height: 24, border: '2px solid #e53e3e', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
       </div>
@@ -85,10 +86,23 @@ function AppRoutes() {
   )
 }
 
+function ThemeApplicator() {
+  const theme = useThemeStore((s) => s.theme)
+
+  useEffect(() => {
+    const html = document.documentElement
+    html.classList.remove('dark', 'light')
+    html.classList.add(theme)
+  }, [theme])
+
+  return null
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <ThemeApplicator />
         <AppRoutes />
       </BrowserRouter>
     </QueryClientProvider>

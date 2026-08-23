@@ -23,7 +23,7 @@ func NewMonitorHandler(db *sqlx.DB) *MonitorHandler {
 
 const monitorCols = `id, name, url, type, interval, timeout, status, active,
 	expected_status, max_retries, uptime_percentage,
-	public, public_slug, group_name, labels, last_checked_at, created_at, updated_at`
+	public, public_slug, group_name, labels, favorite, last_checked_at, created_at, updated_at`
 
 type monitorRow struct {
 	ID               int64          `db:"id" json:"id"`
@@ -41,6 +41,7 @@ type monitorRow struct {
 	PublicSlug       *string        `db:"public_slug" json:"public_slug"`
 	GroupName        string         `db:"group_name" json:"group_name"`
 	Labels           pq.StringArray `db:"labels" json:"labels"`
+	Favorite         bool           `db:"favorite" json:"favorite"`
 	LastCheckedAt    *time.Time     `db:"last_checked_at" json:"last_checked_at"`
 	CreatedAt        time.Time      `db:"created_at" json:"created_at"`
 	UpdatedAt        time.Time      `db:"updated_at" json:"updated_at"`
@@ -64,11 +65,11 @@ func (h *MonitorHandler) List(c echo.Context) error {
 	err := h.db.SelectContext(c.Request().Context(), &monitors,
 		`SELECT m.id, m.name, m.url, m.type, m.interval, m.timeout, m.status, m.active,
 		        m.expected_status, m.max_retries, m.uptime_percentage,
-		        m.public, m.public_slug, m.group_name, m.labels,
+		        m.public, m.public_slug, m.group_name, m.labels, m.favorite,
 		        m.last_checked_at, m.created_at, m.updated_at,
 		        (SELECT l.response_time FROM monitor_logs l
 		         WHERE l.monitor_id = m.id ORDER BY l.checked_at DESC LIMIT 1) AS last_response_time
-		 FROM monitors m ORDER BY m.group_name ASC, m.created_at DESC`)
+		 FROM monitors m ORDER BY m.favorite DESC, m.group_name ASC, m.created_at DESC`)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to fetch monitors")
 	}
@@ -253,6 +254,136 @@ func (h *MonitorHandler) Logs(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, echo.Map{"data": logs})
+}
+
+type bulkUpdateRequest struct {
+	IDs            []int64  `json:"ids"`
+	Type           string   `json:"type"`
+	Interval       int      `json:"interval"`
+	Timeout        int      `json:"timeout"`
+	ExpectedStatus int      `json:"expected_status"`
+	MaxRetries     int      `json:"max_retries"`
+	GroupName      *string  `json:"group_name"`
+	Labels         []string `json:"labels"`
+	SetLabels      bool     `json:"set_labels"`
+	Favorite       bool     `json:"favorite"`
+	SetFavorite    bool     `json:"set_favorite"`
+}
+
+func (h *MonitorHandler) BulkUpdate(c echo.Context) error {
+	var req bulkUpdateRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+	if len(req.IDs) == 0 {
+		return echo.NewHTTPError(http.StatusBadRequest, "ids must not be empty")
+	}
+
+	// Build SET clauses dynamically based on which fields are provided
+	setClauses := []string{"updated_at = NOW()"}
+	args := []interface{}{}
+	argIdx := 1
+
+	if req.Type != "" {
+		setClauses = append(setClauses, fmt.Sprintf("type = $%d", argIdx))
+		args = append(args, req.Type)
+		argIdx++
+	}
+	if req.Interval > 0 {
+		setClauses = append(setClauses, fmt.Sprintf("interval = $%d", argIdx))
+		args = append(args, req.Interval)
+		argIdx++
+	}
+	if req.Timeout > 0 {
+		setClauses = append(setClauses, fmt.Sprintf("timeout = $%d", argIdx))
+		args = append(args, req.Timeout)
+		argIdx++
+	}
+	if req.ExpectedStatus > 0 {
+		setClauses = append(setClauses, fmt.Sprintf("expected_status = $%d", argIdx))
+		args = append(args, req.ExpectedStatus)
+		argIdx++
+	}
+	if req.MaxRetries > 0 {
+		setClauses = append(setClauses, fmt.Sprintf("max_retries = $%d", argIdx))
+		args = append(args, req.MaxRetries)
+		argIdx++
+	}
+	if req.GroupName != nil {
+		setClauses = append(setClauses, fmt.Sprintf("group_name = $%d", argIdx))
+		args = append(args, strings.TrimSpace(*req.GroupName))
+		argIdx++
+	}
+	if req.SetLabels {
+		if req.Labels == nil {
+			req.Labels = []string{}
+		}
+		setClauses = append(setClauses, fmt.Sprintf("labels = $%d", argIdx))
+		args = append(args, pq.Array(req.Labels))
+		argIdx++
+	}
+	if req.SetFavorite {
+		setClauses = append(setClauses, fmt.Sprintf("favorite = $%d", argIdx))
+		args = append(args, req.Favorite)
+		argIdx++
+	}
+
+	if len(setClauses) == 1 {
+		// only updated_at — nothing to do
+		return c.JSON(http.StatusOK, echo.Map{"message": "no fields to update", "updated": 0})
+	}
+
+	// Build IN clause for ids
+	idPlaceholders := make([]string, len(req.IDs))
+	for i, id := range req.IDs {
+		idPlaceholders[i] = fmt.Sprintf("$%d", argIdx)
+		args = append(args, id)
+		argIdx++
+	}
+
+	query := fmt.Sprintf(
+		"UPDATE monitors SET %s WHERE id IN (%s)",
+		strings.Join(setClauses, ", "),
+		strings.Join(idPlaceholders, ", "),
+	)
+
+	result, err := h.db.ExecContext(c.Request().Context(), query, args...)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to bulk update monitors: "+err.Error())
+	}
+	updated, _ := result.RowsAffected()
+
+	return c.JSON(http.StatusOK, echo.Map{"message": "monitors updated", "updated": updated})
+}
+
+type setFavoriteRequest struct {
+	Favorite bool `json:"favorite"`
+}
+
+func (h *MonitorHandler) SetFavorite(c echo.Context) error {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid monitor id")
+	}
+
+	var req setFavoriteRequest
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
+	}
+
+	var monitor monitorRow
+	err = h.db.QueryRowxContext(c.Request().Context(),
+		`UPDATE monitors SET favorite = $1, updated_at = NOW() WHERE id = $2 RETURNING `+monitorCols,
+		req.Favorite, id,
+	).StructScan(&monitor)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return echo.NewHTTPError(http.StatusNotFound, "monitor not found")
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to update favorite")
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{"data": monitor})
 }
 
 type setVisibilityRequest struct {

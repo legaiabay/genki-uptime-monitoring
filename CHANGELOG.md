@@ -1,3 +1,61 @@
+# v1.2.0 (2026-08-24)
+
+## Features
+
+- **Favorite Monitors**: star any monitor to pin it to the top of the list; favorite state persisted in the DB (`monitors.favorite` boolean column, migration `00008`)
+  - `PATCH /api/v1/monitors/:id/favorite` — toggle favorite for a single monitor (`{ "favorite": true|false }`)
+  - Monitor list ordered by `favorite DESC, group_name ASC, created_at DESC`
+  - Overview uptime chart gains an **All / Favorites** toggle — defaults to Favorites when any monitor is starred, falls back to All otherwise
+  - `GET /api/v1/stats/uptime-series?favorites_only=true` — server-side filter for the chart
+  - `useToggleFavorite` hook with optimistic invalidation
+
+- **Bulk Edit**: select multiple monitors on the Monitors page and apply shared fields in one request
+  - `PATCH /api/v1/monitors/bulk` — accepts `ids[]` plus any combination of `type`, `interval`, `timeout`, `expected_status`, `max_retries`, `group_name`, `labels` / `set_labels`, `favorite` / `set_favorite`; only supplied fields are written
+  - Checkbox column added to the monitor table; select-all toggle in the header
+  - Bulk Edit modal with per-field enable toggles — unchecked fields are not changed
+  - `useBulkUpdateMonitors` mutation hook; `BulkUpdatePayload` type exported from `useMonitors.ts`
+
+- **Groups & Labels Manager**: new **Groups & Labels** tab in Settings for global rename and delete operations
+  - `GET /api/v1/settings/groups` — list distinct non-empty group names with monitor counts
+  - `PUT /api/v1/settings/groups/:name` — rename group across all monitors (`{ "name": "new name" }`)
+  - `DELETE /api/v1/settings/groups/:name` — clear group from all monitors (sets `group_name = ''`)
+  - `GET /api/v1/settings/labels` — list distinct labels with usage counts
+  - `PUT /api/v1/settings/labels/:name` — rename label across all monitors
+  - `DELETE /api/v1/settings/labels/:name` — remove label from all monitors
+  - `internal/api/handlers/grouplabel.go` — new handler (`GroupLabelHandler`)
+  - `useGroupsLabels.ts` hook file with `useGroupsWithCount`, `useLabelsWithCount`, `useRenameGroup`, `useDeleteGroup`, `useRenameLabel`, `useDeleteLabel`
+  - `GroupsLabelsTab.tsx` settings component with inline rename inputs and delete-confirm modal
+
+- **Downtime Duration in Recovery Notifications**: recovery notifications now include the total downtime duration
+  - Scheduler queries `incidents.started_at` on recovery to compute elapsed time
+  - `formatDuration` helper produces human-readable strings like `1h 23m 45s`
+  - `notifier.Payload.DowntimeDuration` field — only populated for `EventRecovery`
+  - Template variable `{{downtime_duration}}` available in `recovery_message` templates
+  - Default recovery message appends `Downtime duration: …` when duration is known
+
+- **Response Time Overlay on Uptime Chart**: uptime series now carries average response time per bucket
+  - `uptimePoint.avg_response_time` added to the SQL query
+  - `UptimeMonitorSeries.ResponseTimeValues []float64` — parallel to `Values`; available to the frontend chart
+
+- **Light / Dark Theme**: toggle between light and dark mode from the sidebar footer
+  - `themeStore.ts` — Zustand store with `persist` middleware; persisted under `genki-theme` in `localStorage`; defaults to dark
+  - `index.css` gains a full `html.light { … }` CSS variable overrides block
+  - Sidebar shows Sun / Moon icon toggle; logo swaps to `logo-dark.png` in light mode
+  - Theme class applied to `<html>` in `Layout.tsx`
+
+- **User Avatar**: generated avatar displayed in the sidebar next to the logged-in user's name
+  - `UserAvatar.tsx` component wraps `boring-avatars` (beam variant, custom red palette)
+  - Avatar derived from the user's display name — consistent across sessions
+
+## Changes
+
+- Settings page tabs are now URL-driven — active tab synced to `?tab=` query param; navigating directly to `/settings?tab=groups-labels` works
+- Danger Zone moved to its own **Danger Zone** tab in Settings (previously inline at bottom of General)
+- `web/package.json` gains `boring-avatars` dependency
+- Old logo assets (`logo-old.png`, `logo-old-2.png`) removed from `web/src/assets/`
+
+---
+
 # v1.1.0 (2026-08-23)
 
 ## Features

@@ -101,6 +101,50 @@ export function useDeleteMonitor() {
   })
 }
 
+export interface BulkUpdatePayload {
+  ids: number[]
+  type?: string
+  interval?: number
+  timeout?: number
+  expected_status?: number
+  max_retries?: number
+  group_name?: string | null
+  labels?: string[]
+  set_labels?: boolean
+  favorite?: boolean
+  set_favorite?: boolean
+}
+
+async function bulkUpdateMonitors(payload: BulkUpdatePayload): Promise<{ updated: number }> {
+  const res = await api.patch<{ updated: number }>('/monitors/bulk', payload)
+  return res.data
+}
+
+export function useBulkUpdateMonitors() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: bulkUpdateMonitors,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['monitors'] })
+      qc.invalidateQueries({ queryKey: ['monitor-groups'] })
+    },
+  })
+}
+
+async function toggleFavorite(id: number, favorite: boolean): Promise<Monitor> {
+  const res = await api.patch<{ data: Monitor }>(`/monitors/${id}/favorite`, { favorite })
+  return res.data.data
+}
+
+export function useToggleFavorite() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, favorite }: { id: number; favorite: boolean }) =>
+      toggleFavorite(id, favorite),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['monitors'] }),
+  })
+}
+
 async function toggleVisibility(id: number, isPublic: boolean): Promise<Monitor> {
   const res = await api.patch<{ data: Monitor }>(`/monitors/${id}/visibility`, { public: isPublic })
   return res.data.data

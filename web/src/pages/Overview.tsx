@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine,
 } from 'recharts'
 import {
   Heart, Clock, AlertTriangle,
-  RotateCcw, Plus, MoreVertical, ChevronDown, Search, X, Layers,
+  RotateCcw, Plus, MoreVertical, ChevronDown, Search, X, Layers, Star, Activity,
 } from 'lucide-react'
 import Card from '@/components/ui/Card'
 import StatusBadge from '@/components/ui/StatusBadge'
@@ -79,11 +79,11 @@ function StatCard({ label, value, sub, subColor, icon, barData }: {
     <Card style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>{label}</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#e8e8e8', lineHeight: 1 }}>{value}</div>
+          <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 6 }}>{label}</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1 }}>{value}</div>
           {sub && <div style={{ fontSize: 11, color: subColor ?? '#666', marginTop: 6 }}>{sub}</div>}
         </div>
-        <div style={{ width: 34, height: 34, borderRadius: 8, background: '#222', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555', flexShrink: 0 }}>
+        <div style={{ width: 34, height: 34, borderRadius: 8, background: 'var(--color-surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-dim)', flexShrink: 0 }}>
           {icon}
         </div>
       </div>
@@ -109,11 +109,33 @@ export default function Overview() {
   const { data: stats, isFetching: statsFetching, refetch: refetchStats } = useOverviewStats()
   const { data: monitors = [], isFetching: monitorsFetching, refetch: refetchMonitors } = useMonitors()
   const { data: incidents = [] } = useIncidents()
-  const { data: series } = useUptimeSeries(timeRange)
   const { data: appSettings } = useAppSettings()
   const updateAppSettings = useUpdateAppSettings()
 
   const isFetching = statsFetching || monitorsFetching
+
+  const hasFavorites = monitors.some(m => m.favorite)
+  // Default to 'favorites' if any favorites exist; 'all' otherwise.
+  // Use lazy initializer so it only fires once on mount, not re-derived on every render.
+  const [chartFilter, setChartFilter] = useState<'all' | 'favorites'>(() =>
+    // We don't have monitors on first render, so default to 'favorites' and let
+    // a useEffect below correct to 'all' only when we're certain there are none.
+    'favorites'
+  )
+
+  // Once monitors load: if none are favorited, switch to 'all'.
+  // Never switch back automatically — let the user control it after that.
+  const [correctedDefault, setCorrectedDefault] = useState(false)
+  useEffect(() => {
+    if (!correctedDefault && monitors.length > 0) {
+      setCorrectedDefault(true)
+      if (!hasFavorites) setChartFilter('all')
+    }
+  }, [monitors.length, hasFavorites, correctedDefault])
+
+  const [chartView, setChartView] = useState<'uptime' | 'response_time'>('uptime')
+
+  const { data: series } = useUptimeSeries(timeRange, chartFilter === 'favorites')
 
   const upCount       = monitors.filter(m => m.status === 'up').length
   const downCount     = monitors.filter(m => m.status === 'down').length
@@ -152,6 +174,18 @@ export default function Overview() {
     return point
   })
 
+  // Response-time chart data — use null for zero-value buckets so Recharts skips them
+  const rtChartData = (series?.labels ?? []).map((label, i) => {
+    const point: Record<string, string | number | null> = { time: label }
+    for (const mon of series?.monitors ?? []) {
+      const v = mon.response_time_values?.[i] ?? 0
+      point[mon.name] = v > 0 ? v : null
+    }
+    return point
+  })
+
+  const activeChartData = chartView === 'uptime' ? chartData : rtChartData
+
   const hasSeriesData = chartData.length > 1
 
   function handleRefresh() {
@@ -175,8 +209,8 @@ export default function Overview() {
       {/* header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 600, color: '#e8e8e8', marginBottom: 2 }}>Overview</h1>
-          <p style={{ fontSize: 12, color: '#555' }}>System health at a glance</p>
+          <h1 style={{ fontSize: 20, fontWeight: 600, color: 'var(--color-text)', marginBottom: 2 }}>Overview</h1>
+          <p style={{ fontSize: 12, color: 'var(--color-text-dim)' }}>System health at a glance</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {appSettings?.default_interval && (() => {
@@ -194,21 +228,21 @@ export default function Overview() {
               <div style={{ position: 'relative' }}>
                 <button
                   onClick={() => setShowIntervalDropdown(o => !o)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 6, color: '#888', fontSize: 12, padding: '6px 12px', cursor: 'pointer' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 12, padding: '6px 12px', cursor: 'pointer' }}
                 >
-                  <Clock size={13} />Check interval: <span style={{ color: '#e8e8e8', fontWeight: 500 }}>{intervalLabel}</span><ChevronDown size={12} />
+                  <Clock size={13} />Check interval: <span style={{ color: 'var(--color-text)', fontWeight: 500 }}>{intervalLabel}</span><ChevronDown size={12} />
                 </button>
                 {showIntervalDropdown && (
                   <>
                     <div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={() => setShowIntervalDropdown(false)} />
-                    <div style={{ position: 'absolute', top: 34, right: 0, zIndex: 10, background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 6, minWidth: 160, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                    <div style={{ position: 'absolute', top: 34, right: 0, zIndex: 10, background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 6, minWidth: 160, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
                       {INTERVAL_OPTIONS.map(opt => (
                         <button key={opt.value}
                           onClick={() => {
                             updateAppSettings.mutate({ default_interval: opt.value })
                             setShowIntervalDropdown(false)
                           }}
-                          style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 14px', background: opt.value === appSettings.default_interval ? '#2a2a2a' : 'none', border: 'none', color: opt.value === appSettings.default_interval ? '#e8e8e8' : '#888', fontSize: 12, cursor: 'pointer' }}
+                          style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 14px', background: opt.value === appSettings.default_interval ? 'var(--color-surface-hover)' : 'none', border: 'none', color: opt.value === appSettings.default_interval ? 'var(--color-text)' : 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer' }}
                         >{opt.label}</button>
                       ))}
                     </div>
@@ -220,25 +254,25 @@ export default function Overview() {
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setShowTimeDropdown(o => !o)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 6, color: '#888', fontSize: 12, padding: '6px 12px', cursor: 'pointer' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 12, padding: '6px 12px', cursor: 'pointer' }}
             >
               <Clock size={13} />{selectedRange.label}<ChevronDown size={12} />
             </button>
             {showTimeDropdown && (
               <>
                 <div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={() => setShowTimeDropdown(false)} />
-                <div style={{ position: 'absolute', top: 34, right: 0, zIndex: 10, background: '#1e1e1e', border: '1px solid #2a2a2a', borderRadius: 6, minWidth: 150, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+                <div style={{ position: 'absolute', top: 34, right: 0, zIndex: 10, background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 6, minWidth: 150, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
                   {TIME_RANGES.map(r => (
                     <button key={r.value}
                       onClick={() => { setTimeRange(r.value); setShowTimeDropdown(false); refetchStats(); refetchMonitors() }}
-                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 14px', background: r.value === timeRange ? '#2a2a2a' : 'none', border: 'none', color: r.value === timeRange ? '#e8e8e8' : '#888', fontSize: 12, cursor: 'pointer' }}
+                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 14px', background: r.value === timeRange ? 'var(--color-surface-hover)' : 'none', border: 'none', color: r.value === timeRange ? 'var(--color-text)' : 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer' }}
                     >{r.label}</button>
                   ))}
                 </div>
               </>
             )}
           </div>
-          <button onClick={handleRefresh} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 6, color: '#888', fontSize: 12, padding: '6px 10px', cursor: 'pointer' }}>
+          <button onClick={handleRefresh} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 12, padding: '6px 10px', cursor: 'pointer' }}>
             <RotateCcw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} />
           </button>
           <button onClick={() => navigate('/monitors')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#e53e3e', border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 500, padding: '6px 14px', cursor: 'pointer' }}>
@@ -250,55 +284,136 @@ export default function Overview() {
       {/* ── Uptime chart — full width, all active monitors ── */}
       <Card style={{ padding: '16px 20px', marginBottom: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <div>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8' }}>Uptime — All Monitors</span>
-            <span style={{ fontSize: 12, color: '#555', marginLeft: 10 }}>{selectedRange.label}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
+                {chartView === 'uptime' ? 'Uptime' : 'Response Time'} — All Monitors
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--color-text-dim)', marginLeft: 10 }}>{selectedRange.label}</span>
+            </div>
+
+            {/* Uptime / Response Time view toggle */}
+            <div style={{ display: 'flex', gap: 2, background: 'var(--color-input-bg)', borderRadius: 6, padding: 2, border: '1px solid var(--color-border)' }}>
+              <button
+                onClick={() => setChartView('uptime')}
+                style={{
+                  padding: '3px 10px', borderRadius: 4, fontSize: 11, cursor: 'pointer', border: 'none',
+                  background: chartView === 'uptime' ? 'var(--color-surface-hover)' : 'transparent',
+                  color: chartView === 'uptime' ? 'var(--color-text)' : 'var(--color-text-dim)',
+                  fontWeight: chartView === 'uptime' ? 500 : 400,
+                }}
+              >
+                Uptime %
+              </button>
+              <button
+                onClick={() => setChartView('response_time')}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  padding: '3px 10px', borderRadius: 4, fontSize: 11, cursor: 'pointer', border: 'none',
+                  background: chartView === 'response_time' ? 'var(--color-surface-hover)' : 'transparent',
+                  color: chartView === 'response_time' ? '#4299e1' : 'var(--color-text-dim)',
+                  fontWeight: chartView === 'response_time' ? 500 : 400,
+                }}
+              >
+                <Activity size={10} color={chartView === 'response_time' ? '#4299e1' : '#555'} />
+                Response Time
+              </button>
+            </div>
+
+            {/* All / Favorites toggle — only shown if any monitor is favorited */}
+            {hasFavorites && (
+              <div style={{ display: 'flex', gap: 2, background: 'var(--color-input-bg)', borderRadius: 6, padding: 2, border: '1px solid var(--color-border)' }}>
+                <button
+                  onClick={() => setChartFilter('all')}
+                  style={{
+                    padding: '3px 10px', borderRadius: 4, fontSize: 11, cursor: 'pointer', border: 'none',
+                    background: chartFilter === 'all' ? 'var(--color-surface-hover)' : 'transparent',
+                    color: chartFilter === 'all' ? 'var(--color-text)' : 'var(--color-text-dim)',
+                    fontWeight: chartFilter === 'all' ? 500 : 400,
+                  }}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setChartFilter('favorites')}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    padding: '3px 10px', borderRadius: 4, fontSize: 11, cursor: 'pointer', border: 'none',
+                    background: chartFilter === 'favorites' ? 'var(--color-surface-hover)' : 'transparent',
+                    color: chartFilter === 'favorites' ? '#f6ad55' : 'var(--color-text-dim)',
+                    fontWeight: chartFilter === 'favorites' ? 500 : 400,
+                  }}
+                >
+                  <Star size={10} fill={chartFilter === 'favorites' ? '#f6ad55' : 'none'} color={chartFilter === 'favorites' ? '#f6ad55' : '#555'} />
+                  Favorites
+                </button>
+              </div>
+            )}
           </div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#e8e8e8' }}>
-            {stats ? `${stats.uptime_percentage.toFixed(2)}%` : '—'}
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)' }}>
+            {chartView === 'uptime'
+              ? (stats ? `${stats.uptime_percentage.toFixed(2)}%` : '—')
+              : (stats ? `${stats.avg_response_time}ms` : '—')
+            }
           </div>
         </div>
 
         {activeMonitors.length === 0 ? (
-          <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#444', fontSize: 12 }}>
+          <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-faint)', fontSize: 12 }}>
             No active monitors
           </div>
         ) : !hasSeriesData ? (
-          <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#444', fontSize: 12 }}>
+          <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-faint)', fontSize: 12 }}>
             Not enough data yet — waiting for checks to complete
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={140}>
-            <LineChart data={chartData} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
-              <CartesianGrid stroke="#1e1e1e" vertical={false} />
+            <LineChart data={activeChartData} margin={{ top: 4, right: 8, left: 4, bottom: 0 }}>
+              <CartesianGrid stroke="var(--color-border)" vertical={false} />
               <XAxis
                 dataKey="time"
-                tick={{ fill: '#444', fontSize: 10 }}
+                tick={{ fill: 'var(--color-text-muted)', fontSize: 10 }}
                 tickLine={false}
-                axisLine={{ stroke: '#222' }}
+                axisLine={{ stroke: 'var(--color-border)' }}
                 interval="preserveStartEnd"
               />
-              <YAxis
-                tick={{ fill: '#444', fontSize: 10 }}
-                tickLine={false}
-                axisLine={false}
-                domain={[0, 100]}
-                width={36}
-                tickFormatter={v => `${v}%`}
-                ticks={[0, 25, 50, 75, 100]}
-              />
-              <ReferenceLine y={100} stroke="#1e1e1e" strokeDasharray="3 3" />
+              {chartView === 'uptime' ? (
+                <YAxis
+                  tick={{ fill: 'var(--color-text-muted)', fontSize: 10 }}
+                  tickLine={false}
+                  axisLine={false}
+                  domain={[() => 0, () => 100]}
+                  allowDataOverflow={false}
+                  width={42}
+                  tickFormatter={v => `${v}%`}
+                  ticks={[0, 25, 50, 75, 100]}
+                />
+              ) : (
+                <YAxis
+                  tick={{ fill: 'var(--color-text-muted)', fontSize: 10 }}
+                  tickLine={false}
+                  axisLine={false}
+                  domain={['auto', 'auto']}
+                  width={52}
+                  tickFormatter={v => `${v}ms`}
+                />
+              )}
+              {chartView === 'uptime' && (
+                <ReferenceLine y={100} stroke="var(--color-border)" strokeDasharray="3 3" />
+              )}
               <Tooltip
                 content={({ active, payload, label }) => {
                   if (!active || !payload?.length) return null
                   return (
-                    <div style={{ background: '#1e1e1e', border: '1px solid #333', borderRadius: 6, padding: '8px 12px', fontSize: 12 }}>
-                      <div style={{ color: '#888', marginBottom: 6, fontSize: 11 }}>{label}</div>
+                    <div style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-hover)', borderRadius: 6, padding: '8px 12px', fontSize: 12 }}>
+                      <div style={{ color: 'var(--color-text-muted)', marginBottom: 6, fontSize: 11 }}>{label}</div>
                       {payload.map((p: any) => (
                         <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                           <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.stroke, flexShrink: 0 }} />
-                          <span style={{ color: '#888' }}>{p.name}:</span>
-                          <span style={{ color: '#e8e8e8', fontWeight: 600 }}>{p.value}%</span>
+                          <span style={{ color: 'var(--color-text-muted)' }}>{p.name}:</span>
+                          <span style={{ color: 'var(--color-text)', fontWeight: 600 }}>
+                            {chartView === 'uptime' ? `${p.value}%` : `${p.value}ms`}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -314,6 +429,7 @@ export default function Overview() {
                   strokeWidth={2}
                   dot={false}
                   activeDot={{ r: 4, strokeWidth: 0 }}
+                  connectNulls={false}
                 />
               ))}
             </LineChart>
@@ -328,9 +444,13 @@ export default function Overview() {
               return (
                 <div key={mon.id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                   <span style={{ width: 16, height: 2, borderRadius: 1, background: mon.color, display: 'inline-block', flexShrink: 0 }} />
-                  <span style={{ fontSize: 10, color: '#666' }}>{mon.name}</span>
-                  <span style={{ fontSize: 10, color: '#888', fontWeight: 600 }}>
-                    {live ? `${live.uptime_percentage.toFixed(2)}%` : ''}
+                  <span style={{ fontSize: 10, color: 'var(--color-text-muted)' }}>{mon.name}</span>
+                  <span style={{ fontSize: 10, color: 'var(--color-text-muted)', fontWeight: 600 }}>
+                    {live
+                      ? chartView === 'uptime'
+                        ? `${live.uptime_percentage.toFixed(2)}%`
+                        : `${live.last_response_time ?? 0}ms`
+                      : ''}
                   </span>
                 </div>
               )
@@ -351,8 +471,8 @@ export default function Overview() {
             ].map(item => (
               <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
-                <span style={{ fontSize: 11, color: '#666', width: 50 }}>{item.label}</span>
-                <span style={{ fontSize: 12, color: '#e8e8e8', fontWeight: 600 }}>{item.count}</span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-muted)', width: 50 }}>{item.label}</span>
+                <span style={{ fontSize: 12, color: 'var(--color-text)', fontWeight: 600 }}>{item.count}</span>
               </div>
             ))}
           </div>
@@ -374,26 +494,26 @@ export default function Overview() {
         {/* Monitors table */}
         <Card>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px 10px' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8' }}>Monitors Status</span>
-            <button onClick={() => navigate('/monitors')} style={{ background: 'none', border: 'none', color: '#666', fontSize: 12, cursor: 'pointer' }}>View all</button>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Monitors Status</span>
+            <button onClick={() => navigate('/monitors')} style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer' }}>View all</button>
           </div>
 
           {/* search + group filter */}
           <div style={{ display: 'flex', gap: 8, padding: '0 16px 10px', flexWrap: 'wrap' }}>
             <div style={{ position: 'relative', flex: 1, minWidth: 180 }}>
-              <Search size={12} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: '#555' }} />
+              <Search size={12} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-dim)' }} />
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Search monitors…"
                 style={{
-                  width: '100%', background: '#161616', border: '1px solid #2a2a2a',
-                  borderRadius: 6, color: '#e8e8e8', fontSize: 12,
+                  width: '100%', background: 'var(--color-input-bg)', border: '1px solid var(--color-border)',
+                  borderRadius: 6, color: 'var(--color-text)', fontSize: 12,
                   padding: '5px 28px 5px 26px', outline: 'none', boxSizing: 'border-box',
                 }}
               />
               {search && (
-                <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#555', padding: 0, display: 'flex' }}>
+                <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-dim)', padding: 0, display: 'flex' }}>
                   <X size={11} />
                 </button>
               )}
@@ -405,9 +525,9 @@ export default function Overview() {
                   style={{
                     display: 'flex', alignItems: 'center', gap: 4,
                     padding: '4px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer',
-                    border: groupFilter === null ? '1px solid #3a3a3a' : '1px solid transparent',
-                    background: groupFilter === null ? '#252525' : 'transparent',
-                    color: groupFilter === null ? '#e8e8e8' : '#666',
+                    border: groupFilter === null ? '1px solid var(--color-border-active)' : '1px solid transparent',
+                    background: groupFilter === null ? 'var(--color-surface-hover)' : 'transparent',
+                    color: groupFilter === null ? 'var(--color-text)' : 'var(--color-text-muted)',
                   }}
                 >
                   All
@@ -419,9 +539,9 @@ export default function Overview() {
                     style={{
                       display: 'flex', alignItems: 'center', gap: 4,
                       padding: '4px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer',
-                      border: groupFilter === g ? '1px solid #3a3a3a' : '1px solid transparent',
-                      background: groupFilter === g ? '#252525' : 'transparent',
-                      color: groupFilter === g ? '#e8e8e8' : '#666',
+                      border: groupFilter === g ? '1px solid var(--color-border-active)' : '1px solid transparent',
+                      background: groupFilter === g ? 'var(--color-surface-hover)' : 'transparent',
+                      color: groupFilter === g ? 'var(--color-text)' : 'var(--color-text-muted)',
                     }}
                   >
                     <Layers size={10} color={groupFilter === g ? '#e53e3e' : '#444'} />
@@ -436,7 +556,7 @@ export default function Overview() {
             <thead>
               <tr>
                 {['Monitor', 'Status', 'Uptime', 'Response Time', 'Last Check', 'Next Check', ''].map(h => (
-                  <th key={h} style={{ padding: '8px 16px', textAlign: 'left', fontSize: 11, color: '#555', fontWeight: 500, borderTop: '1px solid #222', borderBottom: '1px solid #222' }}>{h}</th>
+                  <th key={h} style={{ padding: '8px 16px', textAlign: 'left', fontSize: 11, color: 'var(--color-text-dim)', fontWeight: 500, borderTop: '1px solid var(--color-row-divider)', borderBottom: '1px solid var(--color-row-divider)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -444,13 +564,13 @@ export default function Overview() {
               {filteredMonitors.slice(0, 8).map((m, idx) => {
                 const bars = Array(14).fill(m.status === 'pending' ? 'up' : m.status) as MonitorStatus[]
                 return (
-                  <tr key={m.id} style={{ borderBottom: idx < Math.min(filteredMonitors.length, 8) - 1 ? '1px solid #1e1e1e' : 'none' }}>
+                  <tr key={m.id} style={{ borderBottom: idx < Math.min(filteredMonitors.length, 8) - 1 ? '1px solid var(--color-row-divider)' : 'none' }}>
                     <td style={{ padding: '10px 16px' }}>
-                      <div style={{ fontSize: 13, color: '#e8e8e8', fontWeight: 500 }}>{m.name}</div>
-                      <div style={{ fontSize: 11, color: '#555', marginTop: 1 }}>{m.url}</div>
+                      <div style={{ fontSize: 13, color: 'var(--color-text)', fontWeight: 500 }}>{m.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-dim)', marginTop: 1 }}>{m.url}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
                         {m.group_name && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#666', background: '#1e1e1e', padding: '1px 6px', borderRadius: 8, border: '1px solid #2a2a2a' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--color-text-muted)', background: 'var(--color-surface-2)', padding: '1px 6px', borderRadius: 8, border: '1px solid var(--color-border)' }}>
                             <Layers size={9} color="#555" />{m.group_name}
                           </span>
                         )}
@@ -460,13 +580,13 @@ export default function Overview() {
                     <td style={{ padding: '10px 16px' }}>
                       <StatusBadge status={m.status} />
                     </td>
-                    <td style={{ padding: '10px 16px', fontSize: 13, color: '#888' }}>
+                    <td style={{ padding: '10px 16px', fontSize: 13, color: 'var(--color-text-muted)' }}>
                       {m.uptime_percentage === 100 ? '100%' : `${m.uptime_percentage.toFixed(2)}%`}
                     </td>
-                    <td style={{ padding: '10px 16px', fontSize: 13, color: '#888' }}>
+                    <td style={{ padding: '10px 16px', fontSize: 13, color: 'var(--color-text-muted)' }}>
                       {m.last_response_time != null ? `${m.last_response_time}ms` : '—'}
                     </td>
-                    <td style={{ padding: '10px 16px', fontSize: 12, color: '#555' }}>
+                    <td style={{ padding: '10px 16px', fontSize: 12, color: 'var(--color-text-dim)' }}>
                       {m.last_checked_at ? timeAgo(m.last_checked_at) : '—'}
                     </td>
                     <td style={{ padding: '10px 16px' }}>
@@ -475,7 +595,7 @@ export default function Overview() {
                     <td style={{ padding: '10px 16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <MiniSparkline data={bars} width={56} height={18} />
-                        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#444', padding: 2 }}>
+                        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-faint)', padding: 2 }}>
                           <MoreVertical size={14} />
                         </button>
                       </div>
@@ -485,7 +605,7 @@ export default function Overview() {
               })}
               {filteredMonitors.length === 0 && (
                 <tr>
-                  <td colSpan={7} style={{ padding: '24px 16px', textAlign: 'center', color: '#555', fontSize: 12 }}>
+                  <td colSpan={7} style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--color-text-dim)', fontSize: 12 }}>
                     No monitors match your search
                   </td>
                 </tr>
@@ -493,8 +613,8 @@ export default function Overview() {
             </tbody>
           </table>
           {(monitors.length > 8 || filteredMonitors.length > 8) && (
-            <div style={{ padding: '10px 16px', borderTop: '1px solid #1e1e1e', display: 'flex', justifyContent: 'center' }}>
-              <button onClick={() => navigate('/monitors')} style={{ background: 'none', border: 'none', color: '#666', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ padding: '10px 16px', borderTop: '1px solid var(--color-border-subtle)', display: 'flex', justifyContent: 'center' }}>
+              <button onClick={() => navigate('/monitors')} style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
                 View all monitors <ChevronDown size={12} />
               </button>
             </div>
@@ -504,30 +624,30 @@ export default function Overview() {
         {/* Incidents */}
         <Card>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px 10px' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8' }}>Incidents</span>
-            <button onClick={() => navigate('/incidents')} style={{ background: 'none', border: 'none', color: '#666', fontSize: 12, cursor: 'pointer' }}>View all</button>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Incidents</span>
+            <button onClick={() => navigate('/incidents')} style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer' }}>View all</button>
           </div>
           <div style={{ padding: '0 16px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             {incidents.slice(0, 3).map(inc => {
               const st = incidentStatusStyle[inc.status] ?? incidentStatusStyle.investigating
               return (
-                <div key={inc.id} style={{ padding: '10px 12px', background: '#161616', borderRadius: 6, borderLeft: `3px solid ${st.color}` }}>
+                <div key={inc.id} style={{ padding: '10px 12px', background: 'var(--color-input-bg)', borderRadius: 6, borderLeft: `3px solid ${st.color}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                     <AlertTriangle size={12} color={st.color} />
-                    <span style={{ fontSize: 12, color: '#e8e8e8', fontWeight: 500 }}>{inc.title}</span>
+                    <span style={{ fontSize: 12, color: 'var(--color-text)', fontWeight: 500 }}>{inc.title}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span style={{ fontSize: 10, fontWeight: 500, color: st.color, background: st.bg, padding: '1px 6px', borderRadius: 3, textTransform: 'capitalize' }}>
                       {inc.status}
                     </span>
-                    <span style={{ fontSize: 11, color: '#555' }}>Started {timeAgo(inc.started_at)}</span>
+                    <span style={{ fontSize: 11, color: 'var(--color-text-dim)' }}>Started {timeAgo(inc.started_at)}</span>
                   </div>
-                  <div style={{ fontSize: 11, color: '#555', marginTop: 3 }}>Affects 1 monitor</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-dim)', marginTop: 3 }}>Affects 1 monitor</div>
                 </div>
               )
             })}
             {incidents.length === 0 && (
-              <div style={{ fontSize: 12, color: '#555', textAlign: 'center', padding: '16px 0' }}>No active incidents</div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-dim)', textAlign: 'center', padding: '16px 0' }}>No active incidents</div>
             )}
           </div>
         </Card>
@@ -565,7 +685,7 @@ function DonutChart({ up, degraded, down, total, size = 112, strokeWidth = 10 }:
   const subFontSize = size < 90 ? 8 : 10
   return (
     <svg width={size} height={size} style={{ flexShrink: 0 }}>
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#222" strokeWidth={strokeWidth} />
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--color-border-subtle)" strokeWidth={strokeWidth} />
       {arcs.map((arc, i) => (
         <circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={arc.color}
           strokeWidth={strokeWidth}
@@ -574,8 +694,8 @@ function DonutChart({ up, degraded, down, total, size = 112, strokeWidth = 10 }:
           strokeLinecap="butt"
         />
       ))}
-      <text x={cx} y={cy - 3} textAnchor="middle" fill="#e8e8e8" fontSize={fontSize} fontWeight={700}>{total}</text>
-      <text x={cx} y={cy + subFontSize + 3} textAnchor="middle" fill="#555" fontSize={subFontSize}>Total</text>
+      <text x={cx} y={cy - 3} textAnchor="middle" fill="var(--color-text)" fontSize={fontSize} fontWeight={700}>{total}</text>
+      <text x={cx} y={cy + subFontSize + 3} textAnchor="middle" fill="var(--color-text-dim)" fontSize={subFontSize}>Total</text>
     </svg>
   )
 }

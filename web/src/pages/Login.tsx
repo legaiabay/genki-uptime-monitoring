@@ -37,13 +37,25 @@ export default function Login() {
     }
   }
 
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    background: 'var(--color-input-bg)',
+    border: '1px solid var(--color-border)',
+    borderRadius: 8,
+    padding: '10px 14px',
+    fontSize: 13,
+    color: 'var(--color-text)',
+    outline: 'none',
+    transition: 'border-color 0.2s',
+  }
+
   return (
     <div style={{
       minHeight: '90vh',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#0d0d0d',
+      background: 'var(--color-bg)',
       position: 'relative',
       overflow: 'hidden',
     }}>
@@ -68,14 +80,14 @@ export default function Login() {
 
         {/* Card */}
         <div style={{
-          background: '#161616',
-          border: '1px solid #252525',
+          background: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
           borderRadius: 12,
           padding: '32px 28px',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
         }}>
-          <h2 style={{ fontSize: 18, fontWeight: 600, color: '#e8e8e8', marginBottom: 4 }}>Welcome back</h2>
-          <p style={{ fontSize: 13, color: '#555', marginBottom: 24 }}>Sign in to your monitoring dashboard</p>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text)', marginBottom: 4 }}>Welcome back</h2>
+          <p style={{ fontSize: 13, color: 'var(--color-text-dim)', marginBottom: 24 }}>Sign in to your monitoring dashboard</p>
 
           {error && (
             <div style={{
@@ -93,7 +105,7 @@ export default function Login() {
 
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#888', marginBottom: 6, fontWeight: 500 }}>
+              <label style={{ display: 'block', fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 6, fontWeight: 500 }}>
                 Email
               </label>
               <input
@@ -102,24 +114,14 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 required
-                style={{
-                  width: '100%',
-                  background: '#111',
-                  border: '1px solid #2a2a2a',
-                  borderRadius: 8,
-                  padding: '10px 14px',
-                  fontSize: 13,
-                  color: '#e8e8e8',
-                  outline: 'none',
-                  transition: 'border-color 0.2s',
-                }}
+                style={inputStyle}
                 onFocus={e => e.target.style.borderColor = '#e53e3e'}
-                onBlur={e => e.target.style.borderColor = '#2a2a2a'}
+                onBlur={e => e.target.style.borderColor = 'var(--color-border)'}
               />
             </div>
 
             <div style={{ marginBottom: 8 }}>
-              <label style={{ display: 'block', fontSize: 12, color: '#888', marginBottom: 6, fontWeight: 500 }}>
+              <label style={{ display: 'block', fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 6, fontWeight: 500 }}>
                 Password
               </label>
               <input
@@ -128,19 +130,9 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                style={{
-                  width: '100%',
-                  background: '#111',
-                  border: '1px solid #2a2a2a',
-                  borderRadius: 8,
-                  padding: '10px 14px',
-                  fontSize: 13,
-                  color: '#e8e8e8',
-                  outline: 'none',
-                  transition: 'border-color 0.2s',
-                }}
+                style={inputStyle}
                 onFocus={e => e.target.style.borderColor = '#e53e3e'}
-                onBlur={e => e.target.style.borderColor = '#2a2a2a'}
+                onBlur={e => e.target.style.borderColor = 'var(--color-border)'}
               />
             </div>
 

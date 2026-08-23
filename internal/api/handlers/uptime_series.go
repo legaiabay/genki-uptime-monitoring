@@ -18,22 +18,24 @@ func NewUptimeSeriesHandler(db *sqlx.DB) *UptimeSeriesHandler {
 }
 
 type uptimePoint struct {
-	BucketTime time.Time `db:"bucket_time"`
-	MonitorID  int64     `db:"monitor_id"`
-	MonitorName string   `db:"monitor_name"`
-	UptimePct  float64   `db:"uptime_pct"`
+	BucketTime      time.Time `db:"bucket_time"`
+	MonitorID       int64     `db:"monitor_id"`
+	MonitorName     string    `db:"monitor_name"`
+	UptimePct       float64   `db:"uptime_pct"`
+	AvgResponseTime float64   `db:"avg_response_time"`
 }
 
 type UptimeSeriesResponse struct {
-	Labels   []string               `json:"labels"`   // X-axis time labels
-	Monitors []UptimeMonitorSeries  `json:"monitors"` // one entry per monitor
+	Labels   []string              `json:"labels"`   // X-axis time labels
+	Monitors []UptimeMonitorSeries `json:"monitors"` // one entry per monitor
 }
 
 type UptimeMonitorSeries struct {
-	ID     int64     `json:"id"`
-	Name   string    `json:"name"`
-	Color  string    `json:"color"`
-	Values []float64 `json:"values"` // parallel to Labels
+	ID                 int64     `json:"id"`
+	Name               string    `json:"name"`
+	Color              string    `json:"color"`
+	Values             []float64 `json:"values"`               // uptime % — parallel to Labels
+	ResponseTimeValues []float64 `json:"response_time_values"` // avg response time ms — parallel to Labels
 }
 
 // bucket interval and lookback based on time range query param
@@ -63,9 +65,15 @@ func (h *UptimeSeriesHandler) GetSeries(c echo.Context) error {
 	if rangeParam == "" {
 		rangeParam = "24h"
 	}
+	favoritesOnly := c.QueryParam("favorites_only") == "true"
 
 	lookback, bucketSQL, labelFormat := bucketConfig(rangeParam)
 	since := time.Now().Add(-lookback)
+
+	favoriteFilter := ""
+	if favoritesOnly {
+		favoriteFilter = "AND m.favorite = true"
+	}
 
 	rows, err := h.db.QueryContext(ctx, `
 		SELECT
@@ -75,11 +83,15 @@ func (h *UptimeSeriesHandler) GetSeries(c echo.Context) error {
 			ROUND(
 				COUNT(*) FILTER (WHERE ml.status = 'up')::numeric
 				/ NULLIF(COUNT(*), 0) * 100,
-			2) AS uptime_pct
+			2) AS uptime_pct,
+			COALESCE(
+				ROUND(AVG(ml.response_time) FILTER (WHERE ml.response_time > 0)::numeric, 0),
+			0) AS avg_response_time
 		FROM monitor_logs ml
 		JOIN monitors m ON m.id = ml.monitor_id
 		WHERE ml.checked_at >= $1
 		  AND m.active = true
+		  `+favoriteFilter+`
 		GROUP BY bucket_time, ml.monitor_id, m.name
 		ORDER BY bucket_time ASC, m.name ASC
 	`, since)
@@ -90,15 +102,16 @@ func (h *UptimeSeriesHandler) GetSeries(c echo.Context) error {
 
 	// Collect raw points
 	type rawPoint struct {
-		BucketTime  time.Time
-		MonitorID   int64
-		MonitorName string
-		UptimePct   float64
+		BucketTime      time.Time
+		MonitorID       int64
+		MonitorName     string
+		UptimePct       float64
+		AvgResponseTime float64
 	}
 	var points []rawPoint
 	for rows.Next() {
 		var p rawPoint
-		if err := rows.Scan(&p.BucketTime, &p.MonitorID, &p.MonitorName, &p.UptimePct); err != nil {
+		if err := rows.Scan(&p.BucketTime, &p.MonitorID, &p.MonitorName, &p.UptimePct, &p.AvgResponseTime); err != nil {
 			continue
 		}
 		points = append(points, p)
@@ -134,32 +147,41 @@ func (h *UptimeSeriesHandler) GetSeries(c echo.Context) error {
 		}
 	}
 
-	// Fill values matrix (monitors × labels), default 100 where no data
+	// Fill values matrix (monitors × labels), default 100 for uptime / 0 for response time where no data
 	valueMap := make(map[int64]map[string]float64)
+	rtMap := make(map[int64]map[string]float64)
 	for _, p := range points {
 		if valueMap[p.MonitorID] == nil {
 			valueMap[p.MonitorID] = make(map[string]float64)
+			rtMap[p.MonitorID] = make(map[string]float64)
 		}
 		lbl := p.BucketTime.Local().Format(labelFormat)
 		valueMap[p.MonitorID][lbl] = p.UptimePct
+		rtMap[p.MonitorID][lbl] = p.AvgResponseTime
 	}
 
 	result := make([]UptimeMonitorSeries, 0, len(monitorOrder))
 	for i, mon := range monitorOrder {
 		values := make([]float64, len(labels))
+		rtValues := make([]float64, len(labels))
 		for j, lbl := range labels {
 			if v, ok := valueMap[mon.ID][lbl]; ok {
 				values[j] = v
 			} else {
 				values[j] = 100 // assume up if no data in bucket
 			}
+			if rt, ok := rtMap[mon.ID][lbl]; ok {
+				rtValues[j] = rt
+			}
+			// 0 means no data — frontend will skip these in avg calc
 		}
 		color := seriesColors[i%len(seriesColors)]
 		result = append(result, UptimeMonitorSeries{
-			ID:     mon.ID,
-			Name:   mon.Name,
-			Color:  color,
-			Values: values,
+			ID:                 mon.ID,
+			Name:               mon.Name,
+			Color:              color,
+			Values:             values,
+			ResponseTimeValues: rtValues,
 		})
 	}
 

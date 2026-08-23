@@ -32,6 +32,7 @@ Both the down and recovery messages support the following template variables:
 | `{{response_time}}` | Response time in milliseconds |
 | `{{error_message}}` | Error detail (populated on down events) |
 | `{{checked_at}}` | ISO 8601 timestamp of the check |
+| `{{downtime_duration}}` | Human-readable downtime length, e.g. `1h 23m 45s` (recovery events only) |
 
 ### Example templates
 
@@ -47,8 +48,11 @@ Time: {{checked_at}}
 ```
 ✅ *{{monitor_name}}* is back UP
 Response time: {{response_time}}ms
+Downtime: {{downtime_duration}}
 Recovered at: {{checked_at}}
 ```
+
+> `{{downtime_duration}}` is only populated for recovery events. On down-event templates it renders as an empty string.
 
 ## Channel Configuration (JSONB)
 

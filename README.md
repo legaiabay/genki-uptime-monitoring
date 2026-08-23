@@ -4,6 +4,7 @@
 
 **Lightweight self-hosted uptime monitoring**
 
+[![Latest Release](https://img.shields.io/github/v/release/legaiabay/genki-uptime-monitoring?style=flat&label=version&color=brightgreen)](https://github.com/legaiabay/genki-uptime-monitoring/releases/latest)
 [![Go](https://img.shields.io/badge/Go-1.23-00ADD8?style=flat&logo=go&logoColor=white)](https://golang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=flat&logo=react&logoColor=black)](https://react.dev)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat&logo=postgresql&logoColor=white)](https://postgresql.org)
@@ -19,17 +20,22 @@ Genki monitors your HTTP endpoints, TCP ports, and services on a configurable sc
 ## Features
 
 - **Monitor types** — HTTP, TCP, ping with configurable intervals and timeouts
+- **Favorite monitors** — star any monitor to pin it to the top of the list; favorited monitors filter the uptime chart on the Overview dashboard
+- **Bulk edit** — select multiple monitors and apply group, labels, type, interval, timeout, retries, or favorite status in one operation
 - **Groups & labels** — organise monitors into groups with colour-coded labels; filter and search by group or label across the dashboard
+- **Groups & Labels manager** — rename or delete groups and labels globally from Settings → Groups & Labels; monitor counts shown per entry
 - **Multiple public status pages** — each group gets its own public page at `/status/group/<slug>`; the main `/status` page aggregates all public monitors
-- **Show/hide URLs on public pages** — global toggle (Settings → Monitors or the monitors toolbar) controls whether monitor URLs are visible on public status pages
-- **Incident tracking** — automatic open/resolve lifecycle with manual override
-- **Notifications** — Slack, Telegram, Google Chat, generic webhook with separate down/recovery templates
+- **Show/hide URLs on public pages** — global toggle (Settings or the monitors toolbar) controls whether monitor URLs are visible on public status pages
+- **Incident tracking** — automatic open/resolve lifecycle with manual override; recovery notifications include the total downtime duration
+- **Notifications** — Slack, Telegram, Google Chat, generic webhook with separate down/recovery templates; `{{downtime_duration}}` variable available in recovery messages
 - **Heartbeat monitoring** — passive checks; alert when your service stops pinging in
-- **Uptime charts** — time-series sparklines at 1h / 6h / 24h / 7d / 30d resolution
+- **Uptime charts** — time-series sparklines at 1h / 6h / 24h / 7d / 30d resolution with response-time overlay; filter by favorites on the Overview page
 - **API keys** — generate `gk_…` tokens for programmatic access
 - **Real-time updates** — WebSocket push to the dashboard
 - **App log viewer** — live application log stream in Settings → Logs; ring-buffer snapshot on load, real-time tail via WebSocket, filter by level, search, pause/resume, and download as `.txt`
 - **Password reset** — forgot-password flow gated by a server-side `RESET_SECRET` env var; no email required
+- **Light & dark theme** — toggle between light and dark mode from the sidebar; preference persisted across sessions
+- **User avatar** — generated avatar in the sidebar based on the logged-in user's display name
 - **Single binary** — Go backend embeds the React frontend; one Docker image, no separate static server
 
 ## Tech Stack
@@ -71,28 +77,6 @@ cd web && npm install && npm run dev  # frontend dev server (separate terminal)
 Open `http://localhost:5173`. On first run you'll be redirected to `/setup`.
 
 See [docs/development.md](docs/development.md) for the full local setup guide.
-
-## Public Status Pages
-
-Genki serves shareable, unauthenticated status pages so you can keep your users informed without giving them access to the dashboard.
-
-### Main status page — `/status`
-
-Shows all monitors marked as public, grouped by group name. Each group appears as a nav pill at the top — clicking one jumps to that group's section or navigates to the group-scoped page.
-
-### Group status page — `/status/group/<slug>`
-
-Each group with at least one public monitor gets its own dedicated page. The slug is derived from the group name: lowercase with spaces replaced by hyphens (e.g. `Production Services` → `/status/group/production-services`).
-
-The group page includes:
-- A breadcrumb back to the main status page
-- An overall status banner (all systems operational / partial outage / major outage)
-- A stat row showing total monitors, up count, and overall uptime
-- Individual monitor cards with response time, 90-day uptime bars, and any labels
-
-### Making a monitor public
-
-Toggle the **Public** switch when creating or editing a monitor. Public monitors appear on `/status` and, if they belong to a group, on that group's page. Private monitors are never exposed.
 
 ## Configuration
 

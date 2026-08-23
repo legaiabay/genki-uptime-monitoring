@@ -1,20 +1,88 @@
 @import "tailwindcss";
 
-@theme {
+/* ── Dark theme (default) ── */
+:root,
+html.dark {
   --color-bg: #111111;
+  --color-bg-deep: #0a0a0a;
+  --color-sidebar-bg: #161616;
   --color-surface: #1a1a1a;
-  --color-surface-2: #222222;
+  --color-surface-2: #1e1e1e;
+  --color-surface-3: #222222;
+  --color-surface-hover: #252525;
+  --color-input-bg: #161616;
   --color-border: #2a2a2a;
-  --color-border-subtle: #222222;
+  --color-border-subtle: #1e1e1e;
+  --color-border-muted: #222222;
+  --color-border-active: #3a3a3a;
+  --color-row-divider: #1e1e1e;
   --color-text: #e8e8e8;
+  --color-text-secondary: #c8c8c8;
   --color-text-muted: #888888;
   --color-text-dim: #555555;
+  --color-text-faint: #444444;
   --color-primary: #e53e3e;
   --color-primary-hover: #c53030;
   --color-up: #48bb78;
   --color-down: #e53e3e;
   --color-degraded: #ed8936;
   --color-pending: #718096;
+  --color-scrollbar-thumb: #2a2a2a;
+  --color-user-card-bg: #1e1e1e;
+  --color-danger-zone-bg: #160a0a;
+  --color-danger-zone-border: #2a1212;
+  --color-code-bg: #161616;
+  --color-log-bg: #0a0a0a;
+}
+
+/* ── Light theme ── */
+html.light {
+  --color-bg: #f0f2f5;
+  --color-bg-deep: #e4e7ec;
+  --color-sidebar-bg: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-2: #f8f9fb;
+  --color-surface-3: #f0f2f5;
+  --color-surface-hover: #eaecf0;
+  --color-input-bg: #f8f9fb;
+  --color-border: #dde1e7;
+  --color-border-subtle: #eaecf0;
+  --color-border-muted: #dde1e7;
+  --color-border-active: #b0b8c4;
+  --color-row-divider: #f0f2f5;
+  --color-text: #111827;
+  --color-text-secondary: #374151;
+  --color-text-muted: #6b7280;
+  --color-text-dim: #9ca3af;
+  --color-text-faint: #d1d5db;
+  --color-primary: #e53e3e;
+  --color-primary-hover: #c53030;
+  --color-up: #16a34a;
+  --color-down: #dc2626;
+  --color-degraded: #d97706;
+  --color-pending: #6b7280;
+  --color-scrollbar-thumb: #c5cad3;
+  --color-user-card-bg: #f0f2f5;
+  --color-danger-zone-bg: #fff5f5;
+  --color-danger-zone-border: #fed7d7;
+  --color-code-bg: #f0f2f5;
+  --color-log-bg: #f8f9fb;
+}
+
+@theme {
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-surface-2: var(--color-surface-2);
+  --color-border: var(--color-border);
+  --color-text: var(--color-text);
+  --color-text-muted: var(--color-text-muted);
+  --color-text-dim: var(--color-text-dim);
+  --color-primary: #e53e3e;
+  --color-primary-hover: #c53030;
+  --color-up: var(--color-up);
+  --color-down: var(--color-down);
+  --color-degraded: var(--color-degraded);
+  --color-pending: var(--color-pending);
 }
 
 * {
@@ -27,11 +95,12 @@ html,
 body,
 #root {
   height: 100%;
-  background-color: #111111;
-  color: #e8e8e8;
+  background-color: var(--color-bg);
+  color: var(--color-text);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 ::-webkit-scrollbar {
@@ -42,7 +111,7 @@ body,
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2a2a2a;
+  background: var(--color-scrollbar-thumb);
   border-radius: 2px;
 }
 

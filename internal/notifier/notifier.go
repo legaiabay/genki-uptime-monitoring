@@ -20,13 +20,14 @@ const (
 
 // Payload holds the data available to message templates.
 type Payload struct {
-	MonitorName  string
-	MonitorURL   string
-	Status       string
-	ResponseTime int
-	ErrorMessage string
-	CheckedAt    time.Time
-	Event        EventType
+	MonitorName      string
+	MonitorURL       string
+	Status           string
+	ResponseTime     int
+	ErrorMessage     string
+	CheckedAt        time.Time
+	Event            EventType
+	DowntimeDuration string // only populated for EventRecovery
 }
 
 // Notifier sends a notification for a given payload.
@@ -43,6 +44,7 @@ func renderTemplate(tmpl string, p Payload) string {
 		"{{response_time}}", fmt.Sprintf("%d", p.ResponseTime),
 		"{{error_message}}", p.ErrorMessage,
 		"{{checked_at}}", p.CheckedAt.Format(time.RFC3339),
+		"{{downtime_duration}}", p.DowntimeDuration,
 	)
 	return r.Replace(tmpl)
 }
@@ -57,8 +59,12 @@ func defaultMessage(p Payload) string {
 		}
 		return msg
 	}
-	return fmt.Sprintf("✅ *%s* has *recovered*\nURL: %s\nResponse time: %dms\nChecked at: %s",
+	msg := fmt.Sprintf("✅ *%s* has *recovered*\nURL: %s\nResponse time: %dms\nChecked at: %s",
 		p.MonitorName, p.MonitorURL, p.ResponseTime, p.CheckedAt.Format(time.RFC3339))
+	if p.DowntimeDuration != "" {
+		msg += "\nDowntime duration: " + p.DowntimeDuration
+	}
+	return msg
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

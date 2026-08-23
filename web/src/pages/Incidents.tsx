@@ -50,12 +50,12 @@ export default function Incidents() {
       {/* header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
         <div>
-          <h1 style={{ fontSize: 20, fontWeight: 600, color: '#e8e8e8', marginBottom: 2 }}>Incidents</h1>
-          <p style={{ fontSize: 12, color: '#555' }}>{incidents.filter(i => i.status !== 'resolved').length} active incidents</p>
+          <h1 style={{ fontSize: 20, fontWeight: 600, color: 'var(--color-text)', marginBottom: 2 }}>Incidents</h1>
+          <p style={{ fontSize: 12, color: 'var(--color-text-dim)' }}>{incidents.filter(i => i.status !== 'resolved').length} active incidents</p>
         </div>
         <button
           onClick={() => refetch()}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 6, color: '#888', fontSize: 12, padding: '6px 10px', cursor: 'pointer' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 12, padding: '6px 10px', cursor: 'pointer' }}
         >
           <RefreshCw size={13} style={{ animation: isLoading ? 'spin 1s linear infinite' : 'none' }} />
         </button>
@@ -73,8 +73,8 @@ export default function Incidents() {
               <AlertTriangle size={16} color={s.color} />
             </div>
             <div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#e8e8e8', lineHeight: 1 }}>{s.count}</div>
-              <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>{s.label}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1 }}>{s.count}</div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>{s.label}</div>
             </div>
           </Card>
         ))}
@@ -82,21 +82,21 @@ export default function Incidents() {
 
       <Card>
         {/* tabs */}
-        <div style={{ display: 'flex', gap: 4, padding: '12px 16px', borderBottom: '1px solid #222' }}>
+        <div style={{ display: 'flex', gap: 4, padding: '12px 16px', borderBottom: '1px solid var(--color-border-muted)' }}>
           {tabs.map(tab => (
             <button
               key={tab.value}
               onClick={() => setFilter(tab.value)}
               style={{
                 padding: '5px 12px', borderRadius: 5, fontSize: 12, cursor: 'pointer',
-                border: filter === tab.value ? '1px solid #3a3a3a' : '1px solid transparent',
-                background: filter === tab.value ? '#252525' : 'transparent',
-                color: filter === tab.value ? (tabColors[tab.value] ?? '#e8e8e8') : '#666',
+                border: filter === tab.value ? '1px solid var(--color-border-active)' : '1px solid transparent',
+                background: filter === tab.value ? 'var(--color-surface-hover)' : 'transparent',
+                color: filter === tab.value ? (tabColors[tab.value] ?? 'var(--color-text)') : 'var(--color-text-muted)',
                 fontWeight: filter === tab.value ? 500 : 400,
               }}
             >
               {tab.label}
-              <span style={{ marginLeft: 6, fontSize: 11, color: '#444' }}>
+              <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--color-text-muted)' }}>
                 {tab.value === 'all' ? incidents.length : incidents.filter(i => i.status === tab.value).length}
               </span>
             </button>
@@ -106,7 +106,7 @@ export default function Incidents() {
         {/* list */}
         <div>
           {filtered.length === 0 && (
-            <div style={{ padding: '48px', textAlign: 'center', color: '#555', fontSize: 13 }}>
+            <div style={{ padding: '48px', textAlign: 'center', color: 'var(--color-text-dim)', fontSize: 13 }}>
               No incidents found
             </div>
           )}
@@ -117,7 +117,7 @@ export default function Incidents() {
             return (
               <div key={inc.id} style={{
                 padding: '16px',
-                borderBottom: idx < filtered.length - 1 ? '1px solid #1e1e1e' : 'none',
+                borderBottom: idx < filtered.length - 1 ? '1px solid var(--color-row-divider)' : 'none',
                 display: 'flex', gap: 14,
               }}>
                 {/* icon */}
@@ -129,10 +129,10 @@ export default function Incidents() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 6 }}>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#e8e8e8', marginBottom: 3 }}>{inc.title}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 3 }}>{inc.title}</div>
                       {monitor && (
-                        <div style={{ fontSize: 11, color: '#555' }}>
-                          Affects: <span style={{ color: '#888' }}>{monitor.name}</span> — {monitor.url}
+                        <div style={{ fontSize: 11, color: 'var(--color-text-dim)' }}>
+                          Affects: <span style={{ color: 'var(--color-text-muted)' }}>{monitor.name}</span> — {monitor.url}
                         </div>
                       )}
                     </div>
@@ -146,11 +146,11 @@ export default function Incidents() {
 
                   {/* meta */}
                   <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#555' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--color-text-dim)' }}>
                       <Clock size={11} />
                       Started {timeAgo(inc.started_at)}
                     </div>
-                    <div style={{ fontSize: 11, color: '#555' }}>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-dim)' }}>
                       Duration: {duration(inc.started_at, inc.resolved_at)}
                     </div>
                     {inc.resolved_at && (
@@ -167,14 +167,14 @@ export default function Incidents() {
                     {inc.status === 'investigating' && (
                       <button
                         onClick={() => updateMutation.mutate({ id: inc.id, status: 'identified' })}
-                        style={{ background: 'none', border: '1px solid #2a2a2a', borderRadius: 5, color: '#fc8181', fontSize: 11, padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                        style={{ background: 'none', border: '1px solid var(--color-border)', borderRadius: 5, color: '#fc8181', fontSize: 11, padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
                       >
                         Mark Identified
                       </button>
                     )}
                     <button
                       onClick={() => updateMutation.mutate({ id: inc.id, status: 'resolved' })}
-                      style={{ background: 'none', border: '1px solid #2a2a2a', borderRadius: 5, color: '#68d391', fontSize: 11, padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                      style={{ background: 'none', border: '1px solid var(--color-border)', borderRadius: 5, color: '#68d391', fontSize: 11, padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
                     >
                       Mark Resolved
                     </button>

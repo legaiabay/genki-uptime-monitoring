@@ -74,11 +74,13 @@ func (s *Server) registerRoutes(logBuf *applog.Buffer) {
 	protected.GET("/monitors", monitorHandler.List)
 	protected.POST("/monitors", monitorHandler.Create)
 	protected.GET("/monitors/groups", monitorHandler.ListGroups)
+	protected.PATCH("/monitors/bulk", monitorHandler.BulkUpdate)
 	protected.GET("/monitors/:id", monitorHandler.Get)
 	protected.PUT("/monitors/:id", monitorHandler.Update)
 	protected.DELETE("/monitors/:id", monitorHandler.Delete)
 	protected.GET("/monitors/:id/logs", monitorHandler.Logs)
 	protected.PATCH("/monitors/:id/visibility", monitorHandler.SetVisibility)
+	protected.PATCH("/monitors/:id/favorite", monitorHandler.SetFavorite)
 
 	// Public status (no auth)
 	publicHandler := handlers.NewPublicHandler(s.db)
@@ -110,6 +112,15 @@ func (s *Server) registerRoutes(logBuf *applog.Buffer) {
 	protected.GET("/api-keys", apiKeyHandler.List)
 	protected.POST("/api-keys", apiKeyHandler.Create)
 	protected.DELETE("/api-keys/:id", apiKeyHandler.Delete)
+
+	// Groups & Labels management
+	groupLabelHandler := handlers.NewGroupLabelHandler(s.db)
+	protected.GET("/settings/groups", groupLabelHandler.ListGroupsWithCount)
+	protected.PUT("/settings/groups/:name", groupLabelHandler.RenameGroup)
+	protected.DELETE("/settings/groups/:name", groupLabelHandler.DeleteGroup)
+	protected.GET("/settings/labels", groupLabelHandler.ListLabelsWithCount)
+	protected.PUT("/settings/labels/:name", groupLabelHandler.RenameLabel)
+	protected.DELETE("/settings/labels/:name", groupLabelHandler.DeleteLabel)
 
 	// Dashboard stats
 	statsHandler := handlers.NewStatsHandler(s.db)

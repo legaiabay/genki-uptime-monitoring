@@ -26,7 +26,7 @@ make migrate-status                      # show applied / pending state
 | Table | Notes |
 |---|---|
 | `users` | bcrypt-hashed passwords, role field (`admin` / `member`) |
-| `monitors` | `type` is `http`, `tcp`, or `ping`; `public` + `public_slug` for status page; `group_name` and `labels TEXT[]` for organisation |
+| `monitors` | `type` is `http`, `tcp`, or `ping`; `public` + `public_slug` for status page; `group_name` and `labels TEXT[]` for organisation; `favorite BOOLEAN` to pin monitors to the top |
 | `monitor_logs` | partitioned by `monitor_id`; indexed on `checked_at DESC` |
 | `incidents` | `monitor_id` is nullable — incidents survive monitor deletion (`ON DELETE SET NULL`) |
 | `notification_channels` | `type` is UNIQUE — one config per channel type; config stored as JSONB |
@@ -42,11 +42,13 @@ Two optional fields added to the `monitors` table:
 |---|---|---|
 | `group_name` | `VARCHAR(100)` | Free-text group name (e.g. `Production`, `Staging`) |
 | `labels` | `TEXT[]` | Array of short tags (e.g. `["api", "critical"]`) |
+| `favorite` | `BOOLEAN` | Pins monitor to the top of the list; filters the uptime chart on the Overview page |
 
 - `group_name` defaults to `''` (empty string) — monitors without a group are shown in an "Ungrouped" section
 - `labels` is a PostgreSQL native array; queried with standard array operators
 - Slugified group names (lowercase, spaces → hyphens) are used as URL-safe identifiers for group status pages (e.g. `My API` → `my-api`)
 - Labels are stored lowercase with spaces converted to hyphens on input
+- Group names and labels can be renamed or deleted globally via **Settings → Groups & Labels** (or the `PUT/DELETE /api/v1/settings/groups/:name` and `PUT/DELETE /api/v1/settings/labels/:name` endpoints)
 
 ## Heartbeats
 

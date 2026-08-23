@@ -8,8 +8,8 @@ interface Props {
 export default function Card({ children, style }: Props) {
   return (
     <div style={{
-      background: '#1a1a1a',
-      border: '1px solid #252525',
+      background: 'var(--color-surface)',
+      border: '1px solid var(--color-surface-hover)',
       borderRadius: 8,
       ...style,
     }}>

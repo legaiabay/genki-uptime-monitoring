@@ -18,6 +18,7 @@ export interface Monitor {
   public_slug: string | null
   group_name: string
   labels: string[]
+  favorite: boolean
   last_checked_at: string | null
   last_response_time: number | null
   created_at: string
