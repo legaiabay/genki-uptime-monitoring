@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Plus, Search, MoreVertical, Pencil, Trash2, RefreshCw,
   X, Check, Globe, ExternalLink, Tag, Layers, ChevronDown, ChevronRight,
-  CheckSquare, Square, Edit2, FolderOpen, Star,
+  CheckSquare, Square, Edit2, FolderOpen, Star, ShieldCheck, ShieldAlert, ShieldOff,
 } from 'lucide-react'
 import Card from '@/components/ui/Card'
 import StatusBadge from '@/components/ui/StatusBadge'
@@ -54,6 +54,53 @@ const emptyForm: CreateMonitorPayload = {
   max_retries: 1,
   group_name: '',
   labels: [],
+  dns_record_type: 'A',
+  dns_expected_ip: '',
+  ssl_warning_days: 30,
+  grpc_service: '',
+  grpc_method: '',
+}
+
+// ── SSL expiry badge ──────────────────────────────────────────────────────────
+
+function SSLBadge({ expiryDate, warningDays }: { expiryDate: string; warningDays: number }) {
+  const expiry = new Date(expiryDate)
+  const now = new Date()
+  const daysLeft = Math.floor((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  const threshold = warningDays > 0 ? warningDays : 30
+
+  const expired = daysLeft < 0
+  const warning = !expired && daysLeft <= threshold
+
+  const color = expired ? '#e53e3e' : warning ? '#ed8936' : '#48bb78'
+  const Icon = expired ? ShieldOff : warning ? ShieldAlert : ShieldCheck
+
+  const label = expired
+    ? `SSL expired ${Math.abs(daysLeft)}d ago`
+    : daysLeft === 0
+    ? 'SSL expires today'
+    : `SSL ${daysLeft}d`
+
+  const title = expired
+    ? `Certificate expired on ${expiry.toLocaleDateString()}`
+    : `Certificate expires on ${expiry.toLocaleDateString()} (${daysLeft} days left)`
+
+  return (
+    <span
+      title={title}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 3,
+        fontSize: 10, fontWeight: 500,
+        padding: '1px 6px', borderRadius: 10,
+        background: `${color}18`, color,
+        border: `1px solid ${color}40`,
+        whiteSpace: 'nowrap', cursor: 'default',
+      }}
+    >
+      <Icon size={9} />
+      {label}
+    </span>
+  )
 }
 
 // ── Label chip ────────────────────────────────────────────────────────────────
@@ -219,13 +266,19 @@ function GroupInput({
 interface MonitorFormState {
   name: string
   url: string
-  type: 'http' | 'tcp' | 'ping'
+  type: 'http' | 'tcp' | 'ping' | 'dns' | 'ssl' | 'grpc' | 'udp'
   interval: string
   timeout: string
   expected_status: string
   max_retries: string
   group_name: string
   labels: string[]
+  // Type-specific
+  dns_record_type: string
+  dns_expected_ip: string
+  ssl_warning_days: string
+  grpc_service: string
+  grpc_method: string
 }
 
 function payloadFromFormState(f: MonitorFormState): CreateMonitorPayload {
@@ -239,6 +292,11 @@ function payloadFromFormState(f: MonitorFormState): CreateMonitorPayload {
     max_retries: Number(f.max_retries),
     group_name: f.group_name,
     labels: f.labels,
+    dns_record_type: f.dns_record_type || 'A',
+    dns_expected_ip: f.dns_expected_ip,
+    ssl_warning_days: Number(f.ssl_warning_days) || 30,
+    grpc_service: f.grpc_service,
+    grpc_method: f.grpc_method,
   }
 }
 
@@ -265,13 +323,21 @@ function MonitorModal({
     max_retries: String(initial?.max_retries ?? emptyForm.max_retries),
     group_name: initial?.group_name ?? '',
     labels: initial?.labels ?? [],
+    dns_record_type: initial?.dns_record_type ?? 'A',
+    dns_expected_ip: initial?.dns_expected_ip ?? '',
+    ssl_warning_days: String(initial?.ssl_warning_days ?? 30),
+    grpc_service: initial?.grpc_service ?? '',
+    grpc_method: initial?.grpc_method ?? '',
   })
 
   const set = <K extends keyof MonitorFormState>(k: K, v: MonitorFormState[K]) =>
     setForm(f => ({ ...f, [k]: v }))
 
-  const numericFields: (keyof MonitorFormState)[] = ['interval', 'timeout', 'expected_status', 'max_retries']
+  const numericFields: (keyof MonitorFormState)[] = ['interval', 'timeout', 'max_retries']
+  // expected_status only required for HTTP
+  const needsExpectedStatus = form.type === 'http'
   const hasInvalidNumbers = numericFields.some(k => form[k] === '' || isNaN(Number(form[k])) || Number(form[k]) <= 0)
+    || (needsExpectedStatus && (form.expected_status === '' || isNaN(Number(form.expected_status)) || Number(form.expected_status) <= 0))
   const canSave = !loading && form.name.trim() !== '' && form.url.trim() !== '' && !hasInvalidNumbers
 
   const inputStyle = {
@@ -332,18 +398,82 @@ function MonitorModal({
               <select
                 style={{ ...inputStyle, cursor: 'pointer' }}
                 value={form.type}
-                onChange={e => set('type', e.target.value as 'http' | 'tcp' | 'ping')}
+                onChange={e => set('type', e.target.value as MonitorFormState['type'])}
               >
                 <option value="http">HTTP / HTTPS</option>
                 <option value="tcp">TCP Port</option>
                 <option value="ping">Ping</option>
+                <option value="dns">DNS</option>
+                <option value="ssl">SSL Certificate</option>
+                <option value="grpc">gRPC</option>
+                <option value="udp">UDP Port</option>
               </select>
             </div>
-            <div>
-              <label style={labelStyle}>Expected Status</label>
-              <input style={inputStyle} type="number" value={form.expected_status} onChange={e => set('expected_status', e.target.value)} />
-            </div>
+            {form.type === 'http' && (
+              <div>
+                <label style={labelStyle}>Expected Status</label>
+                <input style={inputStyle} type="number" value={form.expected_status} onChange={e => set('expected_status', e.target.value)} />
+              </div>
+            )}
+            {form.type === 'dns' && (
+              <div>
+                <label style={labelStyle}>Record Type</label>
+                <select
+                  style={{ ...inputStyle, cursor: 'pointer' }}
+                  value={form.dns_record_type}
+                  onChange={e => set('dns_record_type', e.target.value)}
+                >
+                  <option value="A">A</option>
+                  <option value="AAAA">AAAA</option>
+                  <option value="CNAME">CNAME</option>
+                  <option value="MX">MX</option>
+                  <option value="TXT">TXT</option>
+                  <option value="NS">NS</option>
+                </select>
+              </div>
+            )}
+            {form.type === 'ssl' && (
+              <div>
+                <label style={labelStyle}>Warn if expiring within (days)</label>
+                <input style={inputStyle} type="number" min={1} value={form.ssl_warning_days} onChange={e => set('ssl_warning_days', e.target.value)} />
+              </div>
+            )}
           </div>
+
+          {/* URL hint per type */}
+          {form.type === 'tcp' && (
+            <p style={{ fontSize: 11, color: 'var(--color-text-dim)', margin: 0 }}>
+              URL format: <code style={{ background: 'var(--color-surface-2)', padding: '1px 5px', borderRadius: 3 }}>host:port</code> — e.g. <em>example.com:5432</em>
+            </p>
+          )}
+          {form.type === 'udp' && (
+            <p style={{ fontSize: 11, color: 'var(--color-text-dim)', margin: 0 }}>
+              URL format: <code style={{ background: 'var(--color-surface-2)', padding: '1px 5px', borderRadius: 3 }}>host:port</code> — e.g. <em>8.8.8.8:53</em>
+            </p>
+          )}
+          {form.type === 'ping' && (
+            <p style={{ fontSize: 11, color: 'var(--color-text-dim)', margin: 0 }}>
+              URL: hostname or IP address — e.g. <em>example.com</em>
+            </p>
+          )}
+          {form.type === 'dns' && (
+            <div>
+              <label style={labelStyle}>Expected value <span style={{ fontWeight: 400, color: 'var(--color-text-dim)' }}>(optional — leave blank to only check resolution)</span></label>
+              <input style={inputStyle} value={form.dns_expected_ip} onChange={e => set('dns_expected_ip', e.target.value)} placeholder="e.g. 93.184.216.34 or mail.example.com." />
+            </div>
+          )}
+          {form.type === 'grpc' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label style={labelStyle}>Service name <span style={{ fontWeight: 400, color: 'var(--color-text-dim)' }}>(optional)</span></label>
+                <input style={inputStyle} value={form.grpc_service} onChange={e => set('grpc_service', e.target.value)} placeholder="e.g. myapp.UserService" />
+              </div>
+              <div>
+                <label style={labelStyle}>Method <span style={{ fontWeight: 400, color: 'var(--color-text-dim)' }}>(optional)</span></label>
+                <input style={inputStyle} value={form.grpc_method} onChange={e => set('grpc_method', e.target.value)} placeholder="e.g. Check" />
+              </div>
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
             <div>
@@ -556,6 +686,10 @@ function BulkEditModal({
                 <option value="http">HTTP / HTTPS</option>
                 <option value="tcp">TCP Port</option>
                 <option value="ping">Ping</option>
+                <option value="dns">DNS</option>
+                <option value="ssl">SSL Certificate</option>
+                <option value="grpc">gRPC</option>
+                <option value="udp">UDP Port</option>
               </select>
             </div>
           </div>
@@ -937,13 +1071,12 @@ function MonitorRow({
       </td>
       <td style={{ padding: '11px 20px', paddingLeft: indent ? 36 : 20, overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, minWidth: 0 }}>
-          <div style={{
-            width: 7, height: 7, borderRadius: '50%', flexShrink: 0, marginTop: 4,
-            background: m.status === 'up' ? '#48bb78' : m.status === 'down' ? '#e53e3e' : m.status === 'degraded' ? '#ed8936' : '#555',
-          }} />
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 13, color: 'var(--color-text)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</span>
+              {m.ssl_expiry_date && m.url.toLowerCase().startsWith('https://') && (
+                <SSLBadge expiryDate={m.ssl_expiry_date} warningDays={m.ssl_warning_days} />
+              )}
             </div>
             <div style={{ fontSize: 11, color: 'var(--color-text-dim)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.url}</div>
             {m.labels.length > 0 && (
@@ -1251,12 +1384,6 @@ export default function Monitors() {
               {showURL ? 'Hide URL' : 'Show URL'}
             </button>
             <button
-              onClick={() => refetch()}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 12, padding: '6px 10px', cursor: 'pointer' }}
-            >
-              <RefreshCw size={13} style={{ animation: isLoading ? 'spin 1s linear infinite' : 'none' }} />
-            </button>
-            <button
               onClick={() => navigate('/settings?tab=groups-labels')}
               title="Manage groups and labels"
               style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 12, padding: '6px 10px', cursor: 'pointer' }}
@@ -1264,12 +1391,17 @@ export default function Monitors() {
               <FolderOpen size={13} /> Manage Groups & Labels
             </button>
             <button
+              onClick={() => refetch()}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 12, padding: '6px 10px', cursor: 'pointer', lineHeight: 1 }}
+            >
+              <RefreshCw size={13} style={{ animation: isLoading ? 'spin 1s linear infinite' : 'none' }} />
+            </button>
+            <button
               onClick={() => setModal({ open: true })}
               style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#e53e3e', border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 500, padding: '6px 14px', cursor: 'pointer' }}
             >
               <Plus size={13} /> Add Monitor
-            </button>
-          </div>
+            </button>          </div>
         </div>
 
         <Card>

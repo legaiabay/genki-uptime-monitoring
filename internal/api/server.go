@@ -113,6 +113,11 @@ func (s *Server) registerRoutes(logBuf *applog.Buffer) {
 	protected.POST("/api-keys", apiKeyHandler.Create)
 	protected.DELETE("/api-keys/:id", apiKeyHandler.Delete)
 
+	// Backup & Restore
+	backupHandler := handlers.NewBackupHandler(s.db)
+	protected.GET("/backup/export", backupHandler.Export)
+	protected.POST("/backup/import", backupHandler.Import)
+
 	// Groups & Labels management
 	groupLabelHandler := handlers.NewGroupLabelHandler(s.db)
 	protected.GET("/settings/groups", groupLabelHandler.ListGroupsWithCount)

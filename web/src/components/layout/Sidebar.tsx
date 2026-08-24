@@ -27,7 +27,9 @@ const navItems = [
 ]
 
 export default function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(() => {
+    return localStorage.getItem('sidebar-collapsed') === 'true'
+  })
   const navigate = useNavigate()
 
   const { data: profile } = useProfile()
@@ -72,7 +74,11 @@ export default function Sidebar() {
           <img src={isLight ? logoDark : logo} alt="Genki" style={{ height: 120 }} />
         )}
         <button
-          onClick={() => setCollapsed(o => !o)}
+          onClick={() => setCollapsed(o => {
+            const next = !o
+            localStorage.setItem('sidebar-collapsed', String(next))
+            return next
+          })}
           style={{
             background: 'none', border: 'none', cursor: 'pointer',
             color: 'var(--color-text-dim)', padding: 4, borderRadius: 4,
@@ -121,7 +127,7 @@ export default function Sidebar() {
         <div style={{
           display: 'flex',
           justifyContent: collapsed ? 'center' : 'flex-start',
-          marginBottom: collapsed ? 0 : 10,
+          marginBottom: collapsed ? 8 : 10,
         }}>
           <button
             onClick={toggleTheme}
@@ -157,6 +163,33 @@ export default function Sidebar() {
             )}
           </button>
         </div>
+
+        {/* Collapsed: avatar + logout */}
+        {collapsed && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+              <div title={displayName} style={{ cursor: 'default' }}>
+                <UserAvatar name={displayName} size={26} borderRadius={6} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <button
+                onClick={handleLogout}
+                title="Sign out"
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--color-text-dim)', padding: '5px 6px', borderRadius: 4,
+                  display: 'flex', alignItems: 'center',
+                  transition: 'color 0.1s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-down)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-text-dim)')}
+              >
+                <LogOut size={13} />
+              </button>
+            </div>
+          </>
+        )}
 
         {/* System status + user card — only when expanded */}
         {!collapsed && (

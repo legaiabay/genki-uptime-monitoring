@@ -5,7 +5,7 @@ import {
 } from 'recharts'
 import {
   Heart, Clock, AlertTriangle,
-  RotateCcw, Plus, MoreVertical, ChevronDown, Search, X, Layers, Star, Activity,
+  RotateCcw, Plus, MoreVertical, ChevronDown, Search, X, Layers, Star, Activity, RefreshCw,
 } from 'lucide-react'
 import Card from '@/components/ui/Card'
 import StatusBadge from '@/components/ui/StatusBadge'
@@ -272,8 +272,8 @@ export default function Overview() {
               </>
             )}
           </div>
-          <button onClick={handleRefresh} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 12, padding: '6px 10px', cursor: 'pointer' }}>
-            <RotateCcw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} />
+          <button onClick={handleRefresh} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 12, padding: '6px 10px', cursor: 'pointer', lineHeight: 1 }}>
+            <RefreshCw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} />
           </button>
           <button onClick={() => navigate('/monitors')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#e53e3e', border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 500, padding: '6px 14px', cursor: 'pointer' }}>
             <Plus size={13} />Add Monitor
@@ -407,7 +407,13 @@ export default function Overview() {
                   return (
                     <div style={{ background: 'var(--color-surface-2)', border: '1px solid var(--color-surface-hover)', borderRadius: 6, padding: '8px 12px', fontSize: 12 }}>
                       <div style={{ color: 'var(--color-text-muted)', marginBottom: 6, fontSize: 11 }}>{label}</div>
-                      {payload.map((p: any) => (
+                      {[...payload]
+                        .sort((a: any, b: any) =>
+                          chartView === 'uptime'
+                            ? (a.value ?? 100) - (b.value ?? 100)
+                            : (b.value ?? 0) - (a.value ?? 0)
+                        )
+                        .map((p: any) => (
                         <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                           <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.stroke, flexShrink: 0 }} />
                           <span style={{ color: 'var(--color-text-muted)' }}>{p.name}:</span>

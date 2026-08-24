@@ -1,3 +1,34 @@
+# v1.3.0 (2026-08-24)
+
+## Features
+
+- **New Monitor Types — DNS, SSL, gRPC**: checker package refactored into a `Checker` interface; each type is its own struct (`HTTPChecker`, `TCPChecker`, `PingChecker`, `DNSChecker`, `SSLChecker`, `GRPCChecker`)
+
+  - **DNS** (`type: dns`) — resolves A, AAAA, CNAME, MX, TXT, or NS records; optional `dns_expected_ip` field validates that at least one result matches the expected value; record type defaults to `A`
+  - **SSL** (`type: ssl`) — dials the host over TLS, reads the leaf certificate expiry; status is `down` if expired, `degraded` if expiry is within `ssl_warning_days` (default 30), `up` otherwise; `ssl_expiry_date` stored on the monitor row and shown as a badge in the UI
+  - **gRPC** (`type: grpc`) — sends a gRPC Health Check protocol request; configurable `grpc_service` and `grpc_method` fields
+
+- **Backup & Restore**: export and import all monitoring data from Settings → Backup & Restore
+  - `GET /api/v1/backup/export` — streams a ZIP archive containing a `backup.json` file with all monitors and heartbeats; filename includes a timestamp
+  - `POST /api/v1/backup/import` — accepts the ZIP (multipart `file` field); upserts monitors and heartbeats by slug/name; returns counts of created/updated records
+  - `internal/api/handlers/backup.go` — `BackupHandler` with `Export` and `Import` methods
+  - `BackupRestoreTab.tsx` settings component — download button + drag-and-drop / file picker for import with progress feedback
+  - `useBackup.ts` hook — `useExportBackup` and `useImportBackup` mutations
+
+## Changes
+
+- `monitors` table gains five new columns (migration `00009`): `dns_record_type VARCHAR(10) DEFAULT 'A'`, `dns_expected_ip TEXT DEFAULT ''`, `ssl_warning_days INT DEFAULT 30`, `grpc_service TEXT DEFAULT ''`, `grpc_method TEXT DEFAULT ''`
+- `monitors` table gains `ssl_expiry_date TIMESTAMPTZ` (migration `00010`)
+- `internal/models/monitor.go` — `MonitorType` constants extended with `dns`, `ssl`, `grpc`, `udp`; new fields added to `Monitor` struct
+- `internal/checker/checker.go` — full rewrite; `Checker` interface introduced; scheduler dispatches to the correct implementation based on `monitor.Type`
+- `internal/scheduler/scheduler.go` — routes each monitor to its typed checker; `ssl_expiry_date` written back to the DB after an SSL check
+- `MonitorFormState` / `CreateMonitorPayload` in `useMonitors.ts` and `Monitors.tsx` extended with DNS, SSL, and gRPC fields; form shows type-specific field groups
+- `SSLBadge` component on monitor rows shows days remaining / expiry warning in amber / expired in red
+- Settings → Backup & Restore tab added (new tab between Logs and Danger Zone)
+- Sidebar collapse state now persisted to `localStorage` — survives page reload
+
+---
+
 # v1.2.0 (2026-08-24)
 
 ## Features

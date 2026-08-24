@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, User, Key, Globe, Loader2, AlertCircle, Copy, Trash2, Plus, CheckCheck, BookOpen, Terminal, Download, TriangleAlert, ScrollText, Wifi, WifiOff, XCircle, FolderOpen } from 'lucide-react'
+import { Check, User, Key, Globe, Loader2, AlertCircle, Copy, Trash2, Plus, CheckCheck, BookOpen, Terminal, Download, TriangleAlert, ScrollText, Wifi, WifiOff, XCircle, FolderOpen, HardDrive } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import api from '@/lib/api'
 import Card from '@/components/ui/Card'
@@ -11,8 +11,9 @@ import {
 import { useApiKeys, useCreateApiKey, useDeleteApiKey } from '@/hooks/useApiKeys'
 import { useAppLogs, type LogLevel } from '@/hooks/useAppLogs'
 import GroupsLabelsTab from '@/components/settings/GroupsLabelsTab'
+import BackupRestoreTab from '@/components/settings/BackupRestoreTab'
 
-type Tab = 'general' | 'profile' | 'groups-labels' | 'api-keys' | 'logs' | 'danger-zone'
+type Tab = 'general' | 'profile' | 'groups-labels' | 'api-keys' | 'logs' | 'backup' | 'danger-zone'
 
 const tabs: Array<{ value: Tab; label: string; icon: typeof User; danger?: boolean }> = [
   { value: 'general',       label: 'General',         icon: Globe },
@@ -20,6 +21,7 @@ const tabs: Array<{ value: Tab; label: string; icon: typeof User; danger?: boole
   { value: 'groups-labels', label: 'Groups & Labels', icon: FolderOpen },
   { value: 'api-keys',      label: 'API Keys',        icon: Key },
   { value: 'logs',          label: 'Logs',            icon: ScrollText },
+  { value: 'backup',        label: 'Backup & Restore', icon: HardDrive },
   { value: 'danger-zone',   label: 'Danger Zone',     icon: TriangleAlert, danger: true },
 ]
 
@@ -1302,6 +1304,7 @@ export default function Settings() {
           {activeTab === 'api-keys'      && <ApiKeysTab />}
           {activeTab === 'groups-labels' && <GroupsLabelsTab />}
           {activeTab === 'logs'          && <LogsTab />}
+          {activeTab === 'backup'        && <BackupRestoreTab />}
           {activeTab === 'danger-zone'   && <DangerZoneTab />}
         </div>
       </div>

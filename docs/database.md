@@ -26,7 +26,7 @@ make migrate-status                      # show applied / pending state
 | Table | Notes |
 |---|---|
 | `users` | bcrypt-hashed passwords, role field (`admin` / `member`) |
-| `monitors` | `type` is `http`, `tcp`, or `ping`; `public` + `public_slug` for status page; `group_name` and `labels TEXT[]` for organisation; `favorite BOOLEAN` to pin monitors to the top |
+| `monitors` | `type` is `http`, `tcp`, `ping`, `dns`, `ssl`, or `grpc`; `public` + `public_slug` for status page; `group_name` and `labels TEXT[]` for organisation; `favorite BOOLEAN` to pin monitors to the top |
 | `monitor_logs` | partitioned by `monitor_id`; indexed on `checked_at DESC` |
 | `incidents` | `monitor_id` is nullable — incidents survive monitor deletion (`ON DELETE SET NULL`) |
 | `notification_channels` | `type` is UNIQUE — one config per channel type; config stored as JSONB |
@@ -43,6 +43,12 @@ Two optional fields added to the `monitors` table:
 | `group_name` | `VARCHAR(100)` | Free-text group name (e.g. `Production`, `Staging`) |
 | `labels` | `TEXT[]` | Array of short tags (e.g. `["api", "critical"]`) |
 | `favorite` | `BOOLEAN` | Pins monitor to the top of the list; filters the uptime chart on the Overview page |
+| `dns_record_type` | `VARCHAR(10)` | DNS record type to query — `A`, `AAAA`, `CNAME`, `MX`, `TXT`, `NS` (default `A`) |
+| `dns_expected_ip` | `TEXT` | Optional expected DNS result; check fails if no record matches |
+| `ssl_warning_days` | `INT` | Days before cert expiry to enter `degraded` state (default `30`) |
+| `ssl_expiry_date` | `TIMESTAMPTZ` | Certificate expiry timestamp; written by the scheduler after each SSL check |
+| `grpc_service` | `TEXT` | gRPC service name for Health Check requests |
+| `grpc_method` | `TEXT` | gRPC method name for Health Check requests |
 
 - `group_name` defaults to `''` (empty string) — monitors without a group are shown in an "Ungrouped" section
 - `labels` is a PostgreSQL native array; queried with standard array operators

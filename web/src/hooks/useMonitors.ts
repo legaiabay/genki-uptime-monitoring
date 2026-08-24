@@ -5,13 +5,19 @@ import type { Monitor } from '@/types'
 export interface CreateMonitorPayload {
   name: string
   url: string
-  type: 'http' | 'tcp' | 'ping'
+  type: 'http' | 'tcp' | 'ping' | 'dns' | 'ssl' | 'grpc' | 'udp'
   interval: number
   timeout: number
   expected_status: number
   max_retries: number
   group_name: string
   labels: string[]
+  // Type-specific fields
+  dns_record_type?: string
+  dns_expected_ip?: string
+  ssl_warning_days?: number
+  grpc_service?: string
+  grpc_method?: string
 }
 
 async function fetchMonitors(): Promise<Monitor[]> {

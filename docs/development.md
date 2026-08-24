@@ -76,6 +76,7 @@ genki-uptime-monitoring/
 │   │   ├── handlers/           # One file per resource group
 │   │   │   ├── apikey.go       # CRUD /api-keys
 │   │   │   ├── auth.go         # POST /auth/login, /auth/register, /auth/reset-password
+│   │   │   ├── backup.go       # GET /backup/export, POST /backup/import
 │   │   │   ├── monitor.go      # CRUD + /logs + /visibility + /groups + /favorite + /bulk
 │   │   │   ├── grouplabel.go   # GET/PUT/DELETE /settings/groups + /settings/labels
 │   │   │   ├── incident.go     # List/Get/Update incidents
@@ -101,7 +102,9 @@ genki-uptime-monitoring/
 │   │       ├── 00005_app_settings.sql
 │   │       ├── 00006_incidents_soft_fk.sql
 │   │       ├── 00007_monitor_groups_labels.sql   # group_name, labels TEXT[]
-│   │       └── 00008_add_monitor_favorite.sql    # favorite BOOLEAN
+│   │       ├── 00008_add_monitor_favorite.sql    # favorite BOOLEAN
+│   │       ├── 00009_new_monitor_types.sql       # dns/ssl/grpc fields
+│   │       └── 00010_add_ssl_expiry_date.sql     # ssl_expiry_date TIMESTAMPTZ
 │   ├── models/                 # Go structs matching DB schema
 │   ├── notifier/               # Channel senders + fan-out dispatcher
 │   └── scheduler/scheduler.go  # Cron: check due monitors, insert logs, fire notifs
@@ -111,11 +114,12 @@ genki-uptime-monitoring/
 │   └── src/
 │       ├── components/         # Layout, UI primitives (Card, StatusBadge, NextCheckBar…)
 │       │   ├── layout/         # Sidebar (with theme toggle + user avatar), Layout
-│       │   ├── settings/       # Settings tab components (GroupsLabelsTab…)
+│       │   ├── settings/       # Settings tab components (GroupsLabelsTab, BackupRestoreTab…)
 │       │   └── ui/             # Card, StatusBadge, MiniSparkline, UptimeBars, NextCheckBar, UserAvatar
 │       ├── hooks/              # TanStack Query hooks (one file per resource)
 │       │   ├── useMonitors.ts  # includes useGroups(), useToggleFavorite(), useBulkUpdateMonitors()
 │       │   ├── useGroupsLabels.ts  # Groups & Labels manager hooks
+│       │   ├── useBackup.ts    # useExportBackup, useImportBackup
 │       │   └── usePublicStatus.ts  # includes useGroupPublicStatus(), usePublicGroups()
 │       ├── lib/api.ts          # Axios singleton with JWT interceptor
 │       ├── pages/              # One file per route

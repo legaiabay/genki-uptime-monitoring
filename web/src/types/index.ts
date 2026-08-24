@@ -1,4 +1,4 @@
-export type MonitorType = 'http' | 'tcp' | 'ping'
+export type MonitorType = 'http' | 'tcp' | 'ping' | 'dns' | 'ssl' | 'grpc' | 'udp'
 export type MonitorStatus = 'up' | 'down' | 'degraded' | 'pending'
 export type IncidentStatus = 'investigating' | 'identified' | 'resolved'
 
@@ -23,6 +23,13 @@ export interface Monitor {
   last_response_time: number | null
   created_at: string
   updated_at: string
+  // Type-specific fields
+  dns_record_type: string
+  dns_expected_ip: string
+  ssl_warning_days: number
+  ssl_expiry_date: string | null
+  grpc_service: string
+  grpc_method: string
 }
 
 export interface MonitorLog {

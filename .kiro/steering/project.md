@@ -63,6 +63,7 @@ genki-uptime-monitoring/
 │   │   │   ├── apikey.go                # CRUD /api-keys + LookupAPIKey helper
 │   │   │   ├── applog.go                # GET /logs — snapshot from ring buffer
 │   │   │   ├── auth.go                  # POST /auth/login, /auth/register, /auth/reset-password
+│   │   │   ├── backup.go                # GET /backup/export, POST /backup/import
 │   │   │   ├── monitor.go               # CRUD + /logs + /visibility + /groups + /favorite + /bulk
 │   │   │   ├── grouplabel.go            # GET/PUT/DELETE /settings/groups + /settings/labels
 │   │   │   ├── incident.go              # List/Get/Update incidents
@@ -89,7 +90,9 @@ genki-uptime-monitoring/
 │   │       ├── 00005_app_settings.sql   # app_settings key-value table
 │   │       ├── 00006_incidents_soft_fk.sql     # incidents.monitor_id SET NULL on delete
 │   │       ├── 00007_monitor_groups_labels.sql # monitors.group_name + labels TEXT[]
-│   │       └── 00008_add_monitor_favorite.sql  # monitors.favorite BOOLEAN
+│   │       ├── 00008_add_monitor_favorite.sql  # monitors.favorite BOOLEAN
+│   │       ├── 00009_new_monitor_types.sql     # dns_record_type, dns_expected_ip, ssl_warning_days, grpc_service, grpc_method
+│   │       └── 00010_add_ssl_expiry_date.sql   # monitors.ssl_expiry_date TIMESTAMPTZ
 │   ├── models/                          # Plain Go structs matching DB schema
 │   ├── notifier/
 │   │   ├── notifier.go                  # Payload, Notifier interface, GoogleChat/Telegram/Slack/Webhook senders
@@ -101,10 +104,10 @@ genki-uptime-monitoring/
 │   └── src/
 │       ├── components/
 │       │   ├── layout/                  # Sidebar (theme toggle + user avatar), Layout
-│       │   ├── settings/                # Settings tab components (GroupsLabelsTab)
+│       │   ├── settings/                # Settings tab components (GroupsLabelsTab, BackupRestoreTab)
 │       │   └── ui/                      # Card, StatusBadge, MiniSparkline, UptimeBars, NextCheckBar, UserAvatar
 │       ├── hooks/                       # useMonitors (+ useGroups, useToggleFavorite, useBulkUpdateMonitors),
-│       │   │                            # useGroupsLabels, useIncidents, useHeartbeats,
+│       │   │                            # useGroupsLabels, useBackup, useIncidents, useHeartbeats,
 │       │   │                            # useProfile, useNotifications, useUptimeSeries,
 │       │   │                            # useOverviewStats, usePublicStatus (+ useGroupPublicStatus,
 │       │   │                            # usePublicGroups), useSiteTitle, useApiKeys,
@@ -159,6 +162,8 @@ All protected endpoints accept `Authorization: Bearer <jwt>` **or** `Authorizati
 | GET | `/api/v1/settings/labels` | List distinct labels with usage counts |
 | PUT | `/api/v1/settings/labels/:name` | Rename label across all monitors |
 | DELETE | `/api/v1/settings/labels/:name` | Remove label from all monitors |
+| GET | `/api/v1/backup/export` | Export all monitors + heartbeats as a timestamped ZIP |
+| POST | `/api/v1/backup/import` | Import monitors + heartbeats from a ZIP (multipart `file`) |
 | GET | `/api/v1/monitors` | List monitors (ordered by favorite DESC, group_name, created_at) |
 | POST | `/api/v1/monitors` | Create monitor |
 | GET | `/api/v1/monitors/groups` | List distinct group names |
@@ -236,6 +241,13 @@ Only used by the Vite dev server — has no effect on production builds.
 - `monitors.group_name` — free-text group name, defaults to `''`; slugified (lowercase, spaces→hyphens) for use in public page URLs
 - `monitors.labels` — `TEXT[]` PostgreSQL array; use `pq.StringArray` / `pq.Array()` in Go
 - `monitors.favorite` — `BOOLEAN NOT NULL DEFAULT FALSE`; controls list ordering and uptime chart filter
+- `monitors` `type` values: `http`, `tcp`, `ping`, `dns`, `ssl`, `grpc`, `udp`
+- `internal/checker/checker.go` defines the `Checker` interface; each type has its own implementation (`HTTPChecker`, `TCPChecker`, `PingChecker`, `DNSChecker`, `SSLChecker`, `GRPCChecker`)
+- `monitors.dns_record_type` — `VARCHAR(10) DEFAULT 'A'`; DNS record type to query (`A`, `AAAA`, `CNAME`, `MX`, `TXT`, `NS`)
+- `monitors.dns_expected_ip` — optional expected value for DNS validation
+- `monitors.ssl_warning_days` — `INT DEFAULT 30`; days before cert expiry to enter `degraded`
+- `monitors.ssl_expiry_date` — `TIMESTAMPTZ`; written back by the scheduler after each SSL check
+- `monitors.grpc_service` / `monitors.grpc_method` — gRPC Health Check target fields
 
 ---
 

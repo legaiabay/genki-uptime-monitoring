@@ -18,15 +18,23 @@ import (
 type Scheduler struct {
 	cron       *cron.Cron
 	db         *sqlx.DB
-	checker    *checker.HTTPChecker
+	checkers   map[models.MonitorType]checker.Checker
 	dispatcher *notifier.Dispatcher
 }
 
 func New(db *sqlx.DB) *Scheduler {
 	return &Scheduler{
-		cron:       cron.New(cron.WithSeconds()),
-		db:         db,
-		checker:    checker.NewHTTPChecker(),
+		cron: cron.New(cron.WithSeconds()),
+		db:   db,
+		checkers: map[models.MonitorType]checker.Checker{
+			models.MonitorTypeHTTP: checker.NewHTTPChecker(),
+			models.MonitorTypeTCP:  checker.NewTCPChecker(),
+			models.MonitorTypePing: checker.NewPingChecker(),
+			models.MonitorTypeDNS:  checker.NewDNSChecker(),
+			models.MonitorTypeSSL:  checker.NewSSLChecker(),
+			models.MonitorTypeGRPC: checker.NewGRPCChecker(),
+			models.MonitorTypeUDP:  checker.NewUDPChecker(),
+		},
 		dispatcher: notifier.NewDispatcher(db),
 	}
 }
@@ -53,7 +61,9 @@ func (s *Scheduler) runChecks() {
 	err := s.db.SelectContext(ctx, &monitors,
 		`SELECT id, name, url, type, interval, timeout, status, active,
 		        expected_status, max_retries, uptime_percentage, last_checked_at,
-		        created_at, updated_at
+		        created_at, updated_at,
+		        dns_record_type, dns_expected_ip, ssl_warning_days,
+		        grpc_service, grpc_method
 		 FROM monitors
 		 WHERE active = true
 		   AND (last_checked_at IS NULL
@@ -87,11 +97,18 @@ func (s *Scheduler) runChecks() {
 }
 
 func (s *Scheduler) checkMonitor(ctx context.Context, mon *models.Monitor) {
+	chk, ok := s.checkers[mon.Type]
+	if !ok {
+		// Fallback to HTTP for unknown types
+		chk = s.checkers[models.MonitorTypeHTTP]
+		log.Printf("[scheduler] unknown monitor type %q for %s, falling back to HTTP", mon.Type, mon.Name)
+	}
+
 	timeout := time.Duration(mon.Timeout) * time.Second
 	checkCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	result, err := s.checker.Check(checkCtx, mon)
+	result, err := chk.Check(checkCtx, mon)
 	if err != nil {
 		log.Printf("[scheduler] check error for %s: %v", mon.Name, err)
 		return
@@ -106,21 +123,39 @@ func (s *Scheduler) checkMonitor(ctx context.Context, mon *models.Monitor) {
 		log.Printf("[scheduler] error inserting log for %s: %v", mon.Name, err)
 	}
 
-	// Update monitor status + uptime + last_checked_at
-	_, err = s.db.ExecContext(ctx,
-		`UPDATE monitors SET
-		   status = $1,
-		   last_checked_at = $2,
-		   uptime_percentage = (
-		     SELECT COALESCE(
-		       ROUND(COUNT(*) FILTER (WHERE status = 'up')::numeric / NULLIF(COUNT(*), 0) * 100, 2),
-		       0
-		     )
-		     FROM monitor_logs WHERE monitor_id = $3 AND checked_at > NOW() - INTERVAL '24 hours'
-		   ),
-		   updated_at = NOW()
-		 WHERE id = $3`,
-		result.Status, result.CheckedAt, result.MonitorID)
+	// Update monitor status + uptime + last_checked_at (+ ssl_expiry_date when present)
+	if result.SSLExpiryDate != nil {
+		_, err = s.db.ExecContext(ctx,
+			`UPDATE monitors SET
+			   status = $1,
+			   last_checked_at = $2,
+			   ssl_expiry_date = $3,
+			   uptime_percentage = (
+			     SELECT COALESCE(
+			       ROUND(COUNT(*) FILTER (WHERE status = 'up')::numeric / NULLIF(COUNT(*), 0) * 100, 2),
+			       0
+			     )
+			     FROM monitor_logs WHERE monitor_id = $4 AND checked_at > NOW() - INTERVAL '24 hours'
+			   ),
+			   updated_at = NOW()
+			 WHERE id = $4`,
+			result.Status, result.CheckedAt, result.SSLExpiryDate, result.MonitorID)
+	} else {
+		_, err = s.db.ExecContext(ctx,
+			`UPDATE monitors SET
+			   status = $1,
+			   last_checked_at = $2,
+			   uptime_percentage = (
+			     SELECT COALESCE(
+			       ROUND(COUNT(*) FILTER (WHERE status = 'up')::numeric / NULLIF(COUNT(*), 0) * 100, 2),
+			       0
+			     )
+			     FROM monitor_logs WHERE monitor_id = $3 AND checked_at > NOW() - INTERVAL '24 hours'
+			   ),
+			   updated_at = NOW()
+			 WHERE id = $3`,
+			result.Status, result.CheckedAt, result.MonitorID)
+	}
 	if err != nil {
 		log.Printf("[scheduler] error updating monitor %s: %v", mon.Name, err)
 	}

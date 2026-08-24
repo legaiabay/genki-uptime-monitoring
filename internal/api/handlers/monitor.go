@@ -23,29 +23,37 @@ func NewMonitorHandler(db *sqlx.DB) *MonitorHandler {
 
 const monitorCols = `id, name, url, type, interval, timeout, status, active,
 	expected_status, max_retries, uptime_percentage,
-	public, public_slug, group_name, labels, favorite, last_checked_at, created_at, updated_at`
+	public, public_slug, group_name, labels, favorite, last_checked_at, created_at, updated_at,
+	dns_record_type, dns_expected_ip, ssl_warning_days, ssl_expiry_date, grpc_service, grpc_method`
 
 type monitorRow struct {
-	ID               int64          `db:"id" json:"id"`
-	Name             string         `db:"name" json:"name"`
-	URL              string         `db:"url" json:"url"`
-	Type             string         `db:"type" json:"type"`
-	Interval         int            `db:"interval" json:"interval"`
-	Timeout          int            `db:"timeout" json:"timeout"`
-	Status           string         `db:"status" json:"status"`
-	Active           bool           `db:"active" json:"active"`
-	ExpectedStatus   int            `db:"expected_status" json:"expected_status"`
-	MaxRetries       int            `db:"max_retries" json:"max_retries"`
+	ID               int64          `db:"id"                json:"id"`
+	Name             string         `db:"name"              json:"name"`
+	URL              string         `db:"url"               json:"url"`
+	Type             string         `db:"type"              json:"type"`
+	Interval         int            `db:"interval"          json:"interval"`
+	Timeout          int            `db:"timeout"           json:"timeout"`
+	Status           string         `db:"status"            json:"status"`
+	Active           bool           `db:"active"            json:"active"`
+	ExpectedStatus   int            `db:"expected_status"   json:"expected_status"`
+	MaxRetries       int            `db:"max_retries"       json:"max_retries"`
 	UptimePercentage float64        `db:"uptime_percentage" json:"uptime_percentage"`
-	Public           bool           `db:"public" json:"public"`
-	PublicSlug       *string        `db:"public_slug" json:"public_slug"`
-	GroupName        string         `db:"group_name" json:"group_name"`
-	Labels           pq.StringArray `db:"labels" json:"labels"`
-	Favorite         bool           `db:"favorite" json:"favorite"`
-	LastCheckedAt    *time.Time     `db:"last_checked_at" json:"last_checked_at"`
-	CreatedAt        time.Time      `db:"created_at" json:"created_at"`
-	UpdatedAt        time.Time      `db:"updated_at" json:"updated_at"`
+	Public           bool           `db:"public"            json:"public"`
+	PublicSlug       *string        `db:"public_slug"       json:"public_slug"`
+	GroupName        string         `db:"group_name"        json:"group_name"`
+	Labels           pq.StringArray `db:"labels"            json:"labels"`
+	Favorite         bool           `db:"favorite"          json:"favorite"`
+	LastCheckedAt    *time.Time     `db:"last_checked_at"   json:"last_checked_at"`
+	CreatedAt        time.Time      `db:"created_at"        json:"created_at"`
+	UpdatedAt        time.Time      `db:"updated_at"        json:"updated_at"`
 	LastResponseTime *int           `db:"last_response_time" json:"last_response_time"`
+	// Type-specific fields
+	DNSRecordType  string     `db:"dns_record_type"  json:"dns_record_type"`
+	DNSExpectedIP  string     `db:"dns_expected_ip"  json:"dns_expected_ip"`
+	SSLWarningDays int        `db:"ssl_warning_days" json:"ssl_warning_days"`
+	SSLExpiryDate  *time.Time `db:"ssl_expiry_date"  json:"ssl_expiry_date"`
+	GRPCService    string     `db:"grpc_service"     json:"grpc_service"`
+	GRPCMethod     string     `db:"grpc_method"      json:"grpc_method"`
 }
 
 type createMonitorRequest struct {
@@ -58,6 +66,12 @@ type createMonitorRequest struct {
 	MaxRetries     int      `json:"max_retries"`
 	GroupName      string   `json:"group_name"`
 	Labels         []string `json:"labels"`
+	// Type-specific fields
+	DNSRecordType  string `json:"dns_record_type"`
+	DNSExpectedIP  string `json:"dns_expected_ip"`
+	SSLWarningDays int    `json:"ssl_warning_days"`
+	GRPCService    string `json:"grpc_service"`
+	GRPCMethod     string `json:"grpc_method"`
 }
 
 func (h *MonitorHandler) List(c echo.Context) error {
@@ -67,6 +81,8 @@ func (h *MonitorHandler) List(c echo.Context) error {
 		        m.expected_status, m.max_retries, m.uptime_percentage,
 		        m.public, m.public_slug, m.group_name, m.labels, m.favorite,
 		        m.last_checked_at, m.created_at, m.updated_at,
+		        m.dns_record_type, m.dns_expected_ip, m.ssl_warning_days, m.ssl_expiry_date,
+		        m.grpc_service, m.grpc_method,
 		        (SELECT l.response_time FROM monitor_logs l
 		         WHERE l.monitor_id = m.id ORDER BY l.checked_at DESC LIMIT 1) AS last_response_time
 		 FROM monitors m ORDER BY m.favorite DESC, m.group_name ASC, m.created_at DESC`)
@@ -125,11 +141,16 @@ func (h *MonitorHandler) Create(c echo.Context) error {
 
 	var monitor monitorRow
 	err := h.db.QueryRowxContext(c.Request().Context(),
-		`INSERT INTO monitors (name, url, type, interval, timeout, expected_status, max_retries, group_name, labels)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		`INSERT INTO monitors (name, url, type, interval, timeout, expected_status, max_retries,
+		                       group_name, labels,
+		                       dns_record_type, dns_expected_ip, ssl_warning_days,
+		                       grpc_service, grpc_method)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		 RETURNING `+monitorCols,
 		req.Name, req.URL, req.Type, req.Interval, req.Timeout, req.ExpectedStatus, req.MaxRetries,
 		req.GroupName, pq.Array(req.Labels),
+		req.DNSRecordType, req.DNSExpectedIP, req.SSLWarningDays,
+		req.GRPCService, req.GRPCMethod,
 	).StructScan(&monitor)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create monitor")
@@ -184,11 +205,18 @@ func (h *MonitorHandler) Update(c echo.Context) error {
 		     max_retries = CASE WHEN $7 > 0 THEN $7 ELSE max_retries END,
 		     group_name = $8,
 		     labels = $9,
+		     dns_record_type = COALESCE(NULLIF($10, ''), dns_record_type),
+		     dns_expected_ip = $11,
+		     ssl_warning_days = CASE WHEN $12 > 0 THEN $12 ELSE ssl_warning_days END,
+		     grpc_service = $13,
+		     grpc_method = $14,
 		     updated_at = NOW()
-		 WHERE id = $10
+		 WHERE id = $15
 		 RETURNING `+monitorCols,
 		req.Name, req.URL, req.Type, req.Interval, req.Timeout, req.ExpectedStatus, req.MaxRetries,
-		strings.TrimSpace(req.GroupName), pq.Array(req.Labels), id,
+		strings.TrimSpace(req.GroupName), pq.Array(req.Labels),
+		req.DNSRecordType, req.DNSExpectedIP, req.SSLWarningDays,
+		req.GRPCService, req.GRPCMethod, id,
 	).StructScan(&monitor)
 	if err != nil {
 		if err == sql.ErrNoRows {
