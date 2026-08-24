@@ -5,7 +5,7 @@ import {
 } from 'recharts'
 import {
   Heart, Clock, AlertTriangle,
-  RotateCcw, Plus, MoreVertical, ChevronDown, Search, X, Layers, Star, Activity, RefreshCw,
+  Plus, MoreVertical, ChevronDown, Search, X, Layers, Star, Activity, RefreshCw,
 } from 'lucide-react'
 import Card from '@/components/ui/Card'
 import StatusBadge from '@/components/ui/StatusBadge'
