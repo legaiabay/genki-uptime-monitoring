@@ -21,20 +21,20 @@ Genki monitors your HTTP endpoints, TCP ports, and services on a configurable sc
 
 - **Monitor types** — HTTP, TCP, ping, DNS, SSL certificate, and gRPC health checks with configurable intervals and timeouts
 - **SSL certificate monitoring** — tracks expiry date; warns when cert expires within a configurable threshold (days); expiry badge on monitor rows
-- **Favorite monitors** — star any monitor to pin it to the top of the list; favorited monitors filter the uptime chart on the Overview dashboard
-- **Bulk edit** — select multiple monitors and apply group, labels, type, interval, timeout, retries, or favorite status in one operation
+- **Uptime charts** — time-series sparklines at 1h / 6h / 24h / 7d / 30d resolution with response-time overlay; filter by favorites on the Overview page
 - **Groups & labels** — organise monitors into groups with colour-coded labels; filter and search by group or label across the dashboard
+- **Bulk edit** — select multiple monitors and apply group, labels, type, interval, timeout, retries, or favorite status in one operation
+- **Favorite monitors** — star any monitor to pin it to the top of the list; favorited monitors filter the uptime chart on the Overview dashboard
 - **Multiple public status pages** — each group gets its own public page at `/status/group/<slug>`; the main `/status` page aggregates all public monitors
 - **Incident tracking** — automatic open/resolve lifecycle with manual override; recovery notifications include the total downtime duration
-- **Notifications** — Slack, Telegram, Google Chat, generic webhook with separate down/recovery templates; `{{downtime_duration}}` variable available in recovery messages
+- **Notifications** — Slack, Telegram, Google Chat, generic webhook with separate down/recovery templates
 - **Heartbeat monitoring** — passive checks; alert when your service stops pinging in
-- **Uptime charts** — time-series sparklines at 1h / 6h / 24h / 7d / 30d resolution with response-time overlay; filter by favorites on the Overview page
 - **API keys** — generate `gk_…` tokens for programmatic access
 - **Real-time updates** — WebSocket push to the dashboard
 - **App log viewer** — live application log stream in Settings → Logs; ring-buffer snapshot on load, real-time tail via WebSocket, filter by level, search, pause/resume, and download as `.txt`
 - **Password reset** — forgot-password flow gated by a server-side `RESET_SECRET` env var; no email required
 - **Backup & Restore** — export all monitors and heartbeats to a JSON/ZIP archive; import back with full field mapping; accessible from Settings → Backup & Restore
-- **Light & dark theme** — toggle between light and dark mode from the sidebar; preference persisted across sessions
+- **Light & dark theme** — toggle between light and dark mode from the sidebar
 - **Single binary** — Go backend embeds the React frontend; one Docker image, no separate static server
 
 ## Tech Stack
