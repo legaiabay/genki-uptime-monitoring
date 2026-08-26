@@ -6,7 +6,9 @@ import {
 import {
   Heart, Clock, AlertTriangle,
   Plus, MoreVertical, ChevronDown, Search, X, Layers, Star, Activity, RefreshCw,
+  Edit2, FileText, Trash2,
 } from 'lucide-react'
+import { useDeleteMonitor, useToggleFavorite } from '@/hooks/useMonitors'
 import Card from '@/components/ui/Card'
 import StatusBadge from '@/components/ui/StatusBadge'
 import MiniSparkline from '@/components/ui/MiniSparkline'
@@ -105,6 +107,11 @@ export default function Overview() {
   const [groupFilter, setGroupFilter] = useState<string | null>(null)
 
   const selectedRange = TIME_RANGES.find(r => r.value === timeRange) ?? TIME_RANGES[2]
+
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null)
+
+  const deleteMonitor = useDeleteMonitor()
+  const toggleFavorite = useToggleFavorite()
 
   const { data: stats, isFetching: statsFetching, refetch: refetchStats } = useOverviewStats()
   const { data: monitors = [], isFetching: monitorsFetching, refetch: refetchMonitors } = useMonitors()
@@ -601,9 +608,64 @@ export default function Overview() {
                     <td style={{ padding: '10px 16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <MiniSparkline data={bars} width={56} height={18} />
-                        <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-faint)', padding: 2 }}>
-                          <MoreVertical size={14} />
-                        </button>
+                        <div style={{ position: 'relative' }}>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(prev => prev === m.id ? null : m.id) }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-faint)', padding: 2, display: 'flex', alignItems: 'center', borderRadius: 4 }}
+                          >
+                            <MoreVertical size={14} />
+                          </button>
+                          {openMenuId === m.id && (
+                            <>
+                              <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setOpenMenuId(null)} />
+                              <div style={{
+                                position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 50,
+                                background: 'var(--color-surface-2)', border: '1px solid var(--color-border)',
+                                borderRadius: 6, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', minWidth: 160, overflow: 'hidden',
+                              }}>
+                                <button
+                                  onClick={() => { setOpenMenuId(null); navigate('/monitors') }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer' }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-hover)')}
+                                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                                >
+                                  <Edit2 size={13} /> Edit
+                                </button>
+                                <button
+                                  onClick={() => { setOpenMenuId(null); navigate(`/monitors`) }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer' }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-hover)')}
+                                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                                >
+                                  <FileText size={13} /> View Logs
+                                </button>
+                                <button
+                                  onClick={() => { toggleFavorite.mutate(m.id); setOpenMenuId(null) }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer' }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-hover)')}
+                                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                                >
+                                  <Star size={13} fill={m.favorite ? '#f6ad55' : 'none'} color={m.favorite ? '#f6ad55' : 'currentColor'} />
+                                  {m.favorite ? 'Unfavorite' : 'Favorite'}
+                                </button>
+                                <div style={{ height: 1, background: 'var(--color-border)', margin: '2px 0' }} />
+                                <button
+                                  onClick={() => {
+                                    if (confirm(`Delete monitor "${m.name}"?`)) {
+                                      deleteMonitor.mutate(m.id)
+                                    }
+                                    setOpenMenuId(null)
+                                  }}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', color: '#fc8181', fontSize: 12, cursor: 'pointer' }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(252,129,129,0.1)')}
+                                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                                >
+                                  <Trash2 size={13} /> Delete
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>

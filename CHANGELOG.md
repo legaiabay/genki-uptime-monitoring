@@ -1,3 +1,19 @@
+# v1.3.1 (2026-08-26)
+
+## Changes
+
+- **Overview monitor actions menu**: the previously inert `MoreVertical` button on each monitor row in the Overview table is now a functional dropdown with Edit, View Logs, Favorite/Unfavorite, and Delete actions
+  - Edit and View Logs navigate to the Monitors page
+  - Favorite/Unfavorite calls `useToggleFavorite` directly from the Overview — no page change needed
+  - Delete prompts for confirmation then calls `useDeleteMonitor`
+  - Menu closes on outside click via a fixed overlay
+
+- **Notifier dispatcher**: notification goroutines now use a detached `context.Background()` with a 15-second timeout instead of inheriting the scheduler's check context
+  - Prevents the scheduler's 30-second deadline from aborting in-flight notification requests mid-send
+  - A structured log line is emitted before each dispatch showing event type, channel, monitor name/URL, status, response time, error message, and checked-at timestamp
+
+---
+
 # v1.3.0 (2026-08-24)
 
 ## Features

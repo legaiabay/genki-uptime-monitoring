@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -25,6 +26,9 @@ func NewDispatcher(db *sqlx.DB) *Dispatcher {
 }
 
 // Notify sends p to all enabled notification channels.
+// A fresh background context is used for each send so that cancellation of
+// the caller's context (e.g. the scheduler's 30-second check timeout) does
+// not abort in-flight notification requests.
 func (d *Dispatcher) Notify(ctx context.Context, p Payload) {
 	var rows []channelRow
 	err := d.db.SelectContext(ctx, &rows,
@@ -40,8 +44,15 @@ func (d *Dispatcher) Notify(ctx context.Context, p Payload) {
 			log.Printf("[notifier] skip channel %d (%s): %v", row.ID, row.Type, err)
 			continue
 		}
+		log.Printf("[notifier] dispatching %s via %s — monitor=%q url=%q status=%q response_time=%dms error=%q checked_at=%s",
+			p.Event, row.Type, p.MonitorName, p.MonitorURL, p.Status,
+			p.ResponseTime, p.ErrorMessage, p.CheckedAt.Format(time.RFC3339))
 		go func(n Notifier, chType string) {
-			if err := n.Send(ctx, p); err != nil {
+			// Use a detached context with its own timeout so the scheduler's
+			// deadline cannot cancel an outgoing HTTP notification request.
+			sendCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			if err := n.Send(sendCtx, p); err != nil {
 				log.Printf("[notifier] channel %s send error: %v", chType, err)
 			} else {
 				log.Printf("[notifier] sent %s notification via %s", p.Event, chType)
