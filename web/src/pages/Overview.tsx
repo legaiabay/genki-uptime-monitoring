@@ -640,7 +640,7 @@ export default function Overview() {
                                   <FileText size={13} /> View Logs
                                 </button>
                                 <button
-                                  onClick={() => { toggleFavorite.mutate(m.id); setOpenMenuId(null) }}
+                                  onClick={() => { toggleFavorite.mutate({ id: m.id, favorite: !m.favorite }); setOpenMenuId(null) }}
                                   style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer' }}
                                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-hover)')}
                                   onMouseLeave={e => (e.currentTarget.style.background = 'none')}
