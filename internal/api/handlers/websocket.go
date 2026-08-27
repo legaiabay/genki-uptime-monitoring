@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/applog"
+	"github.com/legaiabay/genki-uptime-monitoring/internal/applog"
 	"github.com/gorilla/websocket"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"

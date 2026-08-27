@@ -11,6 +11,7 @@ import {
   useSetChannelEnabled,
   type ChannelType,
 } from '@/hooks/useNotifications'
+import { useBreakpoint } from '@/hooks/useBreakpoint'
 
 // ── styles ────────────────────────────────────────────────────────────────────
 
@@ -216,6 +217,7 @@ function WebhookChannelForm(props: WebhookFormProps) {
   const { data: channels = [] } = useNotificationChannels()
   const upsert = useUpsertChannel()
   const setEnabled = useSetChannelEnabled()
+  const { isMobile } = useBreakpoint()
 
   const existing  = channels.find(c => c.type === props.chType)
   const isEnabled = existing?.enabled ?? false
@@ -312,7 +314,14 @@ function WebhookChannelForm(props: WebhookFormProps) {
 
         {/* Down message */}
         <div style={{ background: 'var(--color-input-bg)', border: '1px solid var(--color-border-muted)', borderRadius: 8, padding: '12px 14px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: isMobile ? 'flex-start' : 'center',
+            flexDirection: isMobile ? 'column' : 'row',
+            gap: isMobile ? 8 : 0,
+            marginBottom: 8,
+          }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#e53e3e', flexShrink: 0 }} />
               <label style={{ ...labelStyle, marginBottom: 0, color: 'var(--color-text)' }}>Message when Down</label>
@@ -333,7 +342,14 @@ function WebhookChannelForm(props: WebhookFormProps) {
 
         {/* Recovery message */}
         <div style={{ background: 'var(--color-input-bg)', border: '1px solid var(--color-border-muted)', borderRadius: 8, padding: '12px 14px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: isMobile ? 'flex-start' : 'center',
+            flexDirection: isMobile ? 'column' : 'row',
+            gap: isMobile ? 8 : 0,
+            marginBottom: 8,
+          }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#48bb78', flexShrink: 0 }} />
               <label style={{ ...labelStyle, marginBottom: 0, color: 'var(--color-text)' }}>Message when Recovered</label>
@@ -378,8 +394,10 @@ function WebhookChannelForm(props: WebhookFormProps) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function Notifications() {
+  const { isMobile } = useBreakpoint()
+
   return (
-    <div style={{ padding: '20px 24px' }}>
+    <div style={{ padding: isMobile ? '16px' : '20px 24px' }}>
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 20, fontWeight: 600, color: 'var(--color-text)', marginBottom: 2 }}>Notifications</h1>
         <p style={{ fontSize: 12, color: 'var(--color-text-dim)' }}>Configure how and where you get alerted when a monitor changes status</p>

@@ -26,8 +26,9 @@ COPY . .
 # Copy built frontend into the expected embed path
 COPY --from=frontend-builder /app/web/dist ./internal/api/web/dist
 
+ARG VERSION=dev
 RUN CGO_ENABLED=0 GOOS=linux go build \
-    -ldflags="-w -s" \
+    -ldflags="-w -s -X github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/api/handlers.AppVersion=${VERSION}" \
     -o /app/bin/genki \
     ./cmd/server
 

@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/checker"
-	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/models"
-	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/notifier"
+	"github.com/legaiabay/genki-uptime-monitoring/internal/checker"
+	"github.com/legaiabay/genki-uptime-monitoring/internal/models"
+	"github.com/legaiabay/genki-uptime-monitoring/internal/notifier"
 	"github.com/jmoiron/sqlx"
 	"github.com/robfig/cron/v3"
 )
@@ -97,6 +97,19 @@ func (s *Scheduler) runChecks() {
 }
 
 func (s *Scheduler) checkMonitor(ctx context.Context, mon *models.Monitor) {
+	// Claim this monitor immediately so concurrent scheduler ticks cannot
+	// pick it up again before this check completes. Without this, a slow
+	// check (e.g. a TCP timeout) that outlives the 10-second cron interval
+	// causes the same monitor to be fetched a second time while the first
+	// check is still in flight — both goroutines then read the old status
+	// and both fire a "down" notification.
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE monitors SET last_checked_at = NOW() WHERE id = $1`, mon.ID)
+	if err != nil {
+		log.Printf("[scheduler] error claiming monitor %s: %v", mon.Name, err)
+		// Continue anyway — the check should still proceed.
+	}
+
 	chk, ok := s.checkers[mon.Type]
 	if !ok {
 		// Fallback to HTTP for unknown types

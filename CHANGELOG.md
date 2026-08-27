@@ -1,3 +1,39 @@
+# v1.3.2 (2026-08-27)
+
+## Features
+
+- **Unresolved incidents badge**: the sidebar Incidents nav item now shows a red count badge when there are open (non-resolved) incidents
+  - Expanded sidebar: badge pill appears to the right of the "Incidents" label
+  - Collapsed sidebar: small dot badge sits top-right of the alert icon
+  - Count is capped at 99+ and disappears automatically when all incidents are resolved
+  - Uses `var(--color-down)` so it respects both light and dark themes
+
+- **In-app update notifications**: the sidebar now shows an amber banner when a newer version of Genki is available on GitHub
+  - A new protected endpoint `GET /api/v1/version` fetches the latest release from the GitHub API and compares it against the running version
+  - Returns `current`, `latest`, `update_available`, and `release_url` — falls back gracefully if GitHub is unreachable (no error surfaced to the UI)
+  - The sidebar banner (expanded view) shows the available version, a dismiss button, and a "View release →" link to the GitHub releases page
+  - In collapsed sidebar mode, an `ArrowUpCircle` icon is shown with a tooltip
+  - Dismiss is session-local; the banner reappears on the next page load until the instance is updated
+  - Version is stamped at build time via `-ldflags "-X ...handlers.AppVersion=vX.Y.Z"`; defaults to `dev` when running without ldflags
+  - `Dockerfile` accepts `ARG VERSION=dev`; `docker-compose.yml` forwards the build arg; `make docker-up` auto-detects the tag via `git describe --tags --always --dirty`
+
+- **Mobile-responsive UI**: all protected pages are now usable on phones and tablets
+  - Sidebar auto-collapses on mobile and does not persist the collapsed state to localStorage
+  - **Overview**: header actions compress, chart controls move below the title, stat cards reflow to a 2×2 grid, monitor table switches to a card list, monitors + incidents stack vertically
+  - **Monitors**: filter sidebar becomes a slide-in drawer (with active filter count badge), 11-column table switches to cards, modals use fluid width, toolbar search goes full-width
+  - **Incidents**: summary strip reflows to Active + Identified side-by-side with Resolved full-width below; incident titles clamp to 2 lines
+  - **Notifications**: message block headers stack vertically so test buttons don't overlap labels
+  - **Settings**: sidebar nav switches to a horizontal scrollable tab bar; two-column grids (Profile, General, Groups & Labels, API Keys, Backup) stack to single column; timezone select uses a custom arrow; Generate Key button moves below the subtext
+
+## Bug Fixes
+
+- **Duplicate down notifications**: fixed a race condition in the scheduler that caused two down alerts to be sent for the same event
+  - When a monitor's check took longer than the 10-second scheduler interval (e.g. waiting on a TCP or HTTP timeout against a dead endpoint), the next scheduler tick would re-fetch the same monitor before `last_checked_at` was written back
+  - Both concurrent goroutines read the old `status = 'up'`, both computed `wentDown = true`, and both dispatched a notification — producing duplicate alerts with identical timestamps
+  - Fix: `last_checked_at` is now stamped to `NOW()` at the very start of `checkMonitor`, before the network check begins, so subsequent scheduler ticks skip the monitor while it is still in flight
+
+---
+
 # v1.3.1 (2026-08-26)
 
 ## Changes

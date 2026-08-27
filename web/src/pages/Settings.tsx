@@ -66,6 +66,12 @@ function ProfileTab() {
   const { data: profile, isLoading } = useProfile()
   const updateProfile = useUpdateProfile()
   const changePassword = useChangePassword()
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  useEffect(() => {
+    function onResize() { setIsMobile(window.innerWidth < 768) }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   const [form, setForm] = useState({ name: '', email: '' })
   const [profileState, setProfileState] = useState<SaveState>('idle')
@@ -128,7 +134,7 @@ function ProfileTab() {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, alignItems: 'start' }}>
       {/* ── Left: Profile Information ── */}
       <Card style={{ padding: '20px' }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 16 }}>Profile Information</div>
@@ -424,6 +430,12 @@ function NewKeyModal({ rawKey, onClose }: { rawKey: string; onClose: () => void 
 function ApiKeysTab() {
   const { data: keys = [], isLoading } = useApiKeys()
   const deleteKey = useDeleteApiKey()
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  useEffect(() => {
+    function onResize() { setIsMobile(window.innerWidth < 768) }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   const [showGenerate, setShowGenerate] = useState(false)
   const [newRawKey, setNewRawKey]       = useState<string | null>(null)
@@ -564,20 +576,18 @@ public class Main {
 
       {/* ── Keys table card ── */}
       <Card style={{ padding: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <div>
+        <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>API Keys</div>
-            <div style={{ fontSize: 12, color: 'var(--color-text-dim)', marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: 'var(--color-text-dim)', marginTop: 2, marginBottom: 12 }}>
               Keys authenticate API requests in place of your session token.
             </div>
+            <button
+              onClick={() => setShowGenerate(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#e53e3e', border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 500, padding: '7px 14px', cursor: 'pointer' }}
+            >
+              <Plus size={13} /> Generate Key
+            </button>
           </div>
-          <button
-            onClick={() => setShowGenerate(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#e53e3e', border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 500, padding: '7px 14px', cursor: 'pointer' }}
-          >
-            <Plus size={13} /> Generate Key
-          </button>
-        </div>
 
         {isLoading ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-text-dim)', fontSize: 13, padding: '16px 0' }}>
@@ -638,7 +648,7 @@ public class Main {
           just replace <code style={{ color: 'var(--color-text-muted)', background: 'var(--color-input-bg)', padding: '1px 6px', borderRadius: 3, fontSize: 11 }}>apiKey</code> with your key in the environment.
         </p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
           {/* Postman */}
           <div style={{ background: 'var(--color-bg-deep)', border: '1px solid var(--color-border-subtle)', borderRadius: 8, padding: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
@@ -760,7 +770,8 @@ public class Main {
               <div
                 key={idx}
                 style={{
-                  display: 'grid', gridTemplateColumns: '64px 1fr auto',
+                  display: 'grid',
+                  gridTemplateColumns: isMobile ? '56px 1fr' : '64px 1fr auto',
                   alignItems: 'center', gap: 12, padding: '9px 14px',
                   borderBottom: idx < endpoints.length - 1 ? '1px solid var(--color-row-divider)' : 'none',
                   background: idx % 2 === 0 ? 'transparent' : 'var(--color-bg-deep)',
@@ -773,8 +784,8 @@ public class Main {
                 }}>
                   {ep.method}
                 </span>
-                <code style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{ep.path}</code>
-                <span style={{ fontSize: 12, color: 'var(--color-text-dim)', textAlign: 'right' }}>{ep.desc}</span>
+                <code style={{ fontSize: isMobile ? 11 : 12, color: 'var(--color-text-muted)', wordBreak: 'break-all' }}>{ep.path}</code>
+                {!isMobile && <span style={{ fontSize: 12, color: 'var(--color-text-dim)', textAlign: 'right' }}>{ep.desc}</span>}
               </div>
             ))}
           </div>
@@ -905,6 +916,12 @@ function ResetConfirmModal({ scope, onClose, onConfirm, busy }: {
 function GeneralTab() {
   const { data: settings, isLoading } = useAppSettings()
   const updateSettings = useUpdateAppSettings()
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  useEffect(() => {
+    function onResize() { setIsMobile(window.innerWidth < 768) }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   const [form, setForm] = useState({
     site_name: '', timezone: 'Asia/Jakarta', default_interval: '60', retention_days: '90',
@@ -948,7 +965,7 @@ function GeneralTab() {
       <Card style={{ padding: '20px' }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 16 }}>General Settings</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 14 }}>
             <div>
               <label style={labelStyle}>Site Name</label>
               <input style={inputStyle} value={form.site_name}
@@ -956,16 +973,24 @@ function GeneralTab() {
             </div>
             <div>
               <label style={labelStyle}>Timezone</label>
-              <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.timezone}
-                onChange={e => setForm(f => ({ ...f, timezone: e.target.value }))}>
-                <option value="Asia/Jakarta">Asia/Jakarta (WIB)</option>
-                <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
-                <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
-                <option value="UTC">UTC</option>
-                <option value="Europe/London">Europe/London (GMT)</option>
-                <option value="America/New_York">America/New_York (EST)</option>
-                <option value="America/Los_Angeles">America/Los_Angeles (PST)</option>
-              </select>
+              <div style={{ position: 'relative' }}>
+                <select
+                  style={{ ...inputStyle, cursor: 'pointer', paddingRight: 36, appearance: 'none', WebkitAppearance: 'none' }}
+                  value={form.timezone}
+                  onChange={e => setForm(f => ({ ...f, timezone: e.target.value }))}
+                >
+                  <option value="Asia/Jakarta">Asia/Jakarta (WIB)</option>
+                  <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
+                  <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
+                  <option value="UTC">UTC</option>
+                  <option value="Europe/London">Europe/London (GMT)</option>
+                  <option value="America/New_York">America/New_York (EST)</option>
+                  <option value="America/Los_Angeles">America/Los_Angeles (PST)</option>
+                </select>
+                <svg style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--color-text-muted)' }} width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
             </div>
             <div>
               <label style={labelStyle}>Default Check Interval (seconds)</label>
@@ -1032,15 +1057,15 @@ function DangerZoneTab() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {/* Row 1 — monitoring data only */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: 'var(--color-danger-zone-bg)', border: '1px solid var(--color-danger-zone-border)', borderRadius: 8 }}>
-            <div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 16px', background: 'var(--color-danger-zone-bg)', border: '1px solid var(--color-danger-zone-border)', borderRadius: 8, gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', marginBottom: 3 }}>Reset Monitoring Data</div>
               <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Delete all monitors, logs, incidents, and heartbeats. Users and settings are preserved.</div>
             </div>
             <button
               onClick={() => { setResetError(''); setShowResetModal('monitoring') }}
               style={{
-                display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 16,
+                display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
                 background: 'transparent', border: '1px solid var(--color-border-active)', borderRadius: 6,
                 color: 'var(--color-text-muted)', fontSize: 12, fontWeight: 500, padding: '7px 14px', cursor: 'pointer',
               }}
@@ -1050,15 +1075,15 @@ function DangerZoneTab() {
           </div>
 
           {/* Row 2 — everything including users */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', background: 'var(--color-danger-zone-bg)', border: '1px solid var(--color-danger-zone-border)', borderRadius: 8 }}>
-            <div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 16px', background: 'var(--color-danger-zone-bg)', border: '1px solid var(--color-danger-zone-border)', borderRadius: 8, gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', marginBottom: 3 }}>Reset All Data</div>
               <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Delete everything including users and settings. App returns to first-boot state, you will be logged out.</div>
             </div>
             <button
               onClick={() => { setResetError(''); setShowResetModal('all') }}
               style={{
-                display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 16,
+                display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
                 background: 'transparent', border: '1px solid #e53e3e', borderRadius: 6,
                 color: '#e53e3e', fontSize: 12, fontWeight: 500, padding: '7px 14px', cursor: 'pointer',
               }}
@@ -1248,66 +1273,122 @@ export default function Settings() {
     tabParam && validTabs.includes(tabParam) ? tabParam : 'general'
   )
 
+  // Read width once — SSR-safe, updates on resize via a simple listener
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  useEffect(() => {
+    function onResize() { setIsMobile(window.innerWidth < 768) }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   function handleTabChange(tab: Tab) {
     setActiveTab(tab)
     setSearchParams({ tab }, { replace: true })
   }
 
   return (
-    <div style={{ padding: '20px 24px' }}>
-      <div style={{ marginBottom: 24 }}>
+    <div style={{ padding: isMobile ? '16px' : '20px 24px' }}>
+      <div style={{ marginBottom: isMobile ? 16 : 24 }}>
         <h1 style={{ fontSize: 20, fontWeight: 600, color: 'var(--color-text)', marginBottom: 2 }}>Settings</h1>
         <p style={{ fontSize: 12, color: 'var(--color-text-dim)' }}>Manage your account and preferences</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 20 }}>
-        {/* sidebar nav */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {tabs.map((tab, idx) => {
-            const Icon = tab.icon
-            const active = activeTab === tab.value
-            const prevDanger = idx > 0 && tabs[idx - 1].danger
-            const showSeparator = tab.danger && !prevDanger
-            return (
-              <div key={tab.value}>
-                {showSeparator && (
-                  <div style={{ height: 1, background: 'var(--color-border)', margin: '6px 0' }} />
-                )}
+      {isMobile ? (
+        /* ── Mobile: horizontal scrolling tab bar ── */
+        <div>
+          <div style={{
+            display: 'flex', gap: 4, overflowX: 'auto', WebkitOverflowScrolling: 'touch' as any,
+            padding: '4px 0 12px',
+            marginBottom: 16,
+            borderBottom: '1px solid var(--color-border)',
+            alignItems: 'center',
+          }}>
+            {tabs.map((tab, idx) => {
+              const Icon = tab.icon
+              const active = activeTab === tab.value
+              const prevDanger = idx > 0 && tabs[idx - 1].danger
+              return (
                 <button
+                  key={tab.value}
                   onClick={() => handleTabChange(tab.value)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '9px 12px', borderRadius: 6, border: 'none',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    padding: '6px 12px', borderRadius: 6, border: 'none',
                     background: active
                       ? (tab.danger ? 'rgba(229,62,62,0.1)' : 'var(--color-surface-hover)')
                       : 'transparent',
                     color: tab.danger
                       ? (active ? '#e53e3e' : '#e53e3ebb')
                       : (active ? 'var(--color-text)' : 'var(--color-text-muted)'),
-                    fontSize: 13, fontWeight: active ? 500 : 400,
-                    cursor: 'pointer', textAlign: 'left', width: '100%',
-                    transition: 'background 0.1s, color 0.1s',
+                    fontSize: 12, fontWeight: active ? 500 : 400,
+                    cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                    marginLeft: tab.danger && !prevDanger ? 8 : 0,
                   }}
                 >
-                  <Icon size={14} strokeWidth={1.8} />
+                  <Icon size={13} strokeWidth={1.8} />
                   {tab.label}
                 </button>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
+          <div>
+            {activeTab === 'general'       && <GeneralTab />}
+            {activeTab === 'profile'       && <ProfileTab />}
+            {activeTab === 'api-keys'      && <ApiKeysTab />}
+            {activeTab === 'groups-labels' && <GroupsLabelsTab />}
+            {activeTab === 'logs'          && <LogsTab />}
+            {activeTab === 'backup'        && <BackupRestoreTab />}
+            {activeTab === 'danger-zone'   && <DangerZoneTab />}
+          </div>
         </div>
-
-        {/* content */}
-        <div>
-          {activeTab === 'general'       && <GeneralTab />}
-          {activeTab === 'profile'       && <ProfileTab />}
-          {activeTab === 'api-keys'      && <ApiKeysTab />}
-          {activeTab === 'groups-labels' && <GroupsLabelsTab />}
-          {activeTab === 'logs'          && <LogsTab />}
-          {activeTab === 'backup'        && <BackupRestoreTab />}
-          {activeTab === 'danger-zone'   && <DangerZoneTab />}
+      ) : (
+        /* ── Desktop: sidebar + content ── */
+        <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 20 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {tabs.map((tab, idx) => {
+              const Icon = tab.icon
+              const active = activeTab === tab.value
+              const prevDanger = idx > 0 && tabs[idx - 1].danger
+              const showSeparator = tab.danger && !prevDanger
+              return (
+                <div key={tab.value}>
+                  {showSeparator && (
+                    <div style={{ height: 1, background: 'var(--color-border)', margin: '6px 0' }} />
+                  )}
+                  <button
+                    onClick={() => handleTabChange(tab.value)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '9px 12px', borderRadius: 6, border: 'none',
+                      background: active
+                        ? (tab.danger ? 'rgba(229,62,62,0.1)' : 'var(--color-surface-hover)')
+                        : 'transparent',
+                      color: tab.danger
+                        ? (active ? '#e53e3e' : '#e53e3ebb')
+                        : (active ? 'var(--color-text)' : 'var(--color-text-muted)'),
+                      fontSize: 13, fontWeight: active ? 500 : 400,
+                      cursor: 'pointer', textAlign: 'left', width: '100%',
+                      transition: 'background 0.1s, color 0.1s',
+                    }}
+                  >
+                    <Icon size={14} strokeWidth={1.8} />
+                    {tab.label}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+          <div>
+            {activeTab === 'general'       && <GeneralTab />}
+            {activeTab === 'profile'       && <ProfileTab />}
+            {activeTab === 'api-keys'      && <ApiKeysTab />}
+            {activeTab === 'groups-labels' && <GroupsLabelsTab />}
+            {activeTab === 'logs'          && <LogsTab />}
+            {activeTab === 'backup'        && <BackupRestoreTab />}
+            {activeTab === 'danger-zone'   && <DangerZoneTab />}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

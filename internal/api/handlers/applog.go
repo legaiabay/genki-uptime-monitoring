@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/applog"
+	"github.com/legaiabay/genki-uptime-monitoring/internal/applog"
 	"github.com/labstack/echo/v4"
 )
 

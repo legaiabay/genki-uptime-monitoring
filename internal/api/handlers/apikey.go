@@ -10,8 +10,8 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 
-	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/api/middleware"
-	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/models"
+	"github.com/legaiabay/genki-uptime-monitoring/internal/api/middleware"
+	"github.com/legaiabay/genki-uptime-monitoring/internal/models"
 )
 
 type APIKeyHandler struct {

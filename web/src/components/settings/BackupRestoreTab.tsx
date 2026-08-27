@@ -2,6 +2,7 @@ import { useRef, useState, type DragEvent } from 'react'
 import { Download, Upload, CheckCircle, AlertCircle, Loader2, FileJson } from 'lucide-react'
 import Card from '@/components/ui/Card'
 import { useExportBackup, useImportBackup, type ImportResult } from '@/hooks/useBackup'
+import { useBreakpoint } from '@/hooks/useBreakpoint'
 
 const sectionTitleStyle = {
   fontSize: 13,
@@ -251,6 +252,7 @@ function ImportSection() {
 }
 
 function ImportSummary({ result, onReset }: { result: ImportResult; onReset: () => void }) {
+  const { isMobile } = useBreakpoint()
   const rows: Array<{ label: string; value: number; color?: string }> = [
     { label: 'Monitors created', value: result.monitors_created, color: '#68d391' },
     { label: 'Monitors skipped (already exist)', value: result.monitors_skipped },
@@ -271,7 +273,7 @@ function ImportSummary({ result, onReset }: { result: ImportResult; onReset: () 
         <span style={{ fontSize: 13, fontWeight: 600, color: '#68d391' }}>Import successful</span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', marginBottom: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '6px 16px', marginBottom: 14 }}>
         {rows.map(r => (
           <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
             <span style={{ color: 'var(--color-text-muted)' }}>{r.label}</span>
@@ -298,8 +300,9 @@ function ImportSummary({ result, onReset }: { result: ImportResult; onReset: () 
 }
 
 export default function BackupRestoreTab() {
+  const { isMobile } = useBreakpoint()
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: '50%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: isMobile ? '100%' : '50%' }}>
       <ExportSection />
       <ImportSection />
     </div>

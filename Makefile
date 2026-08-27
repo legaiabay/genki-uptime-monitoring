@@ -60,7 +60,8 @@ frontend-build: ## Build frontend for production
 
 # ─── Docker (production) ──────────────────────────────────────────────────────
 
-docker-up: ## Build and start production stack
+docker-up: ## Build and start production stack (pass VERSION=vX.Y.Z to stamp the binary)
+	VERSION=$$(git describe --tags --always --dirty 2>/dev/null || echo "dev") \
 	docker compose up -d --build
 
 docker-down: ## Stop production stack

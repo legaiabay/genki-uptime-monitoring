@@ -4,6 +4,7 @@ import {
   Plus, Search, MoreVertical, Pencil, Trash2, RefreshCw,
   X, Check, Globe, ExternalLink, Tag, Layers, ChevronDown, ChevronRight,
   CheckSquare, Square, Edit2, FolderOpen, Star, ShieldCheck, ShieldAlert, ShieldOff,
+  SlidersHorizontal,
 } from 'lucide-react'
 import Card from '@/components/ui/Card'
 import StatusBadge from '@/components/ui/StatusBadge'
@@ -22,6 +23,7 @@ import {
   type BulkUpdatePayload,
 } from '@/hooks/useMonitors'
 import { useShowURLSetting, useToggleShowURL } from '@/hooks/useShowURLSetting'
+import { useBreakpoint } from '@/hooks/useBreakpoint'
 import type { Monitor, MonitorStatus } from '@/types'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -262,7 +264,6 @@ function GroupInput({
 
 // ── Monitor create/edit modal ─────────────────────────────────────────────────
 
-// Number fields are stored as strings so the input can be empty while the user is typing.
 interface MonitorFormState {
   name: string
   url: string
@@ -273,7 +274,6 @@ interface MonitorFormState {
   max_retries: string
   group_name: string
   labels: string[]
-  // Type-specific
   dns_record_type: string
   dns_expected_ip: string
   ssl_warning_days: string
@@ -334,7 +334,6 @@ function MonitorModal({
     setForm(f => ({ ...f, [k]: v }))
 
   const numericFields: (keyof MonitorFormState)[] = ['interval', 'timeout', 'max_retries']
-  // expected_status only required for HTTP
   const needsExpectedStatus = form.type === 'http'
   const hasInvalidNumbers = numericFields.some(k => form[k] === '' || isNaN(Number(form[k])) || Number(form[k]) <= 0)
     || (needsExpectedStatus && (form.expected_status === '' || isNaN(Number(form.expected_status)) || Number(form.expected_status) <= 0))
@@ -353,10 +352,11 @@ function MonitorModal({
       position: 'fixed', inset: 0, zIndex: 100,
       background: 'rgba(0,0,0,0.7)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '16px',
     }}>
       <div style={{
         background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10,
-        width: 520, maxHeight: '90vh', overflowY: 'auto',
+        width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto',
       }}>
         {/* header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--color-border-muted)' }}>
@@ -440,7 +440,6 @@ function MonitorModal({
             )}
           </div>
 
-          {/* URL hint per type */}
           {form.type === 'tcp' && (
             <p style={{ fontSize: 11, color: 'var(--color-text-dim)', margin: 0 }}>
               URL format: <code style={{ background: 'var(--color-surface-2)', padding: '1px 5px', borderRadius: 3 }}>host:port</code> — e.g. <em>example.com:5432</em>
@@ -490,7 +489,6 @@ function MonitorModal({
             </div>
           </div>
 
-          {/* Labels */}
           <div>
             <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>
               <Tag size={11} />Labels
@@ -531,8 +529,6 @@ function MonitorModal({
 
 // ── Bulk edit modal ───────────────────────────────────────────────────────────
 
-// Each field has a "enabled" toggle — only enabled fields are sent in the request.
-// Numeric fields are stored as strings so inputs can be temporarily empty.
 interface BulkForm {
   type: string
   typeEnabled: boolean
@@ -564,20 +560,13 @@ function BulkEditModal({
   groups: string[]
 }) {
   const [form, setForm] = useState<BulkForm>({
-    type: 'http',
-    typeEnabled: false,
-    interval: '60',
-    intervalEnabled: false,
-    timeout: '30',
-    timeoutEnabled: false,
-    expected_status: '200',
-    expectedStatusEnabled: false,
-    max_retries: '1',
-    maxRetriesEnabled: false,
-    group_name: '',
-    groupNameEnabled: false,
-    labels: [],
-    labelsEnabled: false,
+    type: 'http', typeEnabled: false,
+    interval: '60', intervalEnabled: false,
+    timeout: '30', timeoutEnabled: false,
+    expected_status: '200', expectedStatusEnabled: false,
+    max_retries: '1', maxRetriesEnabled: false,
+    group_name: '', groupNameEnabled: false,
+    labels: [], labelsEnabled: false,
   })
 
   const set = <K extends keyof BulkForm>(k: K, v: BulkForm[K]) =>
@@ -588,13 +577,7 @@ function BulkEditModal({
     borderRadius: 6, color: 'var(--color-text)', fontSize: 13, padding: '8px 12px',
     outline: 'none', boxSizing: 'border-box',
   }
-
-  const disabledInputStyle: React.CSSProperties = {
-    ...inputStyle,
-    opacity: 0.35,
-    pointerEvents: 'none',
-  }
-
+  const disabledInputStyle: React.CSSProperties = { ...inputStyle, opacity: 0.35, pointerEvents: 'none' }
   const labelStyle: React.CSSProperties = { fontSize: 12, color: 'var(--color-text-muted)', display: 'block', marginBottom: 6 }
 
   const anyEnabled =
@@ -602,7 +585,6 @@ function BulkEditModal({
     form.expectedStatusEnabled || form.maxRetriesEnabled ||
     form.groupNameEnabled || form.labelsEnabled
 
-  // A numeric field is invalid only when it's enabled and empty/non-positive
   const numericInvalid =
     (form.intervalEnabled && (form.interval === '' || Number(form.interval) <= 0)) ||
     (form.timeoutEnabled && (form.timeout === '' || Number(form.timeout) <= 0)) ||
@@ -610,7 +592,7 @@ function BulkEditModal({
     (form.maxRetriesEnabled && (form.max_retries === '' || isNaN(Number(form.max_retries))))
 
   function handleSave() {
-    const payload: BulkUpdatePayload = { ids: [] } // ids filled by caller
+    const payload: BulkUpdatePayload = { ids: [] }
     if (form.typeEnabled) payload.type = form.type
     if (form.intervalEnabled) payload.interval = Number(form.interval)
     if (form.timeoutEnabled) payload.timeout = Number(form.timeout)
@@ -621,16 +603,12 @@ function BulkEditModal({
     onSave(payload)
   }
 
-  // Checkbox toggle button
   function FieldToggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
     return (
       <button
         onClick={onToggle}
         title={enabled ? 'Disable this field' : 'Enable this field'}
-        style={{
-          background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-          color: enabled ? '#e53e3e' : '#444', display: 'flex', alignItems: 'center', flexShrink: 0,
-        }}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: enabled ? '#e53e3e' : '#444', display: 'flex', alignItems: 'center', flexShrink: 0 }}
       >
         {enabled ? <CheckSquare size={14} /> : <Square size={14} />}
       </button>
@@ -642,12 +620,12 @@ function BulkEditModal({
       position: 'fixed', inset: 0, zIndex: 100,
       background: 'rgba(0,0,0,0.7)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '16px',
     }}>
       <div style={{
         background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10,
-        width: 540, maxHeight: '90vh', overflowY: 'auto',
+        width: '100%', maxWidth: 540, maxHeight: '90vh', overflowY: 'auto',
       }}>
-        {/* header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--color-border-muted)' }}>
           <div>
             <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Bulk Edit Monitors</span>
@@ -660,29 +638,18 @@ function BulkEditModal({
           </button>
         </div>
 
-        {/* hint */}
         <div style={{ padding: '12px 20px', background: 'var(--color-surface-2)', borderBottom: '1px solid var(--color-border-subtle)' }}>
           <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: 0 }}>
             Check the box next to each field you want to apply to all selected monitors. Unchecked fields will not be changed.
           </p>
         </div>
 
-        {/* body */}
         <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-          {/* Type */}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-            <div style={{ paddingTop: 26 }}>
-              <FieldToggle enabled={form.typeEnabled} onToggle={() => set('typeEnabled', !form.typeEnabled)} />
-            </div>
+            <div style={{ paddingTop: 26 }}><FieldToggle enabled={form.typeEnabled} onToggle={() => set('typeEnabled', !form.typeEnabled)} /></div>
             <div style={{ flex: 1 }}>
               <label style={labelStyle}>Monitor Type</label>
-              <select
-                style={form.typeEnabled ? { ...inputStyle, cursor: 'pointer' } : { ...disabledInputStyle, cursor: 'default' }}
-                value={form.type}
-                onChange={e => set('type', e.target.value)}
-                disabled={!form.typeEnabled}
-              >
+              <select style={form.typeEnabled ? { ...inputStyle, cursor: 'pointer' } : { ...disabledInputStyle, cursor: 'default' }} value={form.type} onChange={e => set('type', e.target.value)} disabled={!form.typeEnabled}>
                 <option value="http">HTTP / HTTPS</option>
                 <option value="tcp">TCP Port</option>
                 <option value="ping">Ping</option>
@@ -694,139 +661,74 @@ function BulkEditModal({
             </div>
           </div>
 
-          {/* Interval + Timeout */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-              <div style={{ paddingTop: 26 }}>
-                <FieldToggle enabled={form.intervalEnabled} onToggle={() => set('intervalEnabled', !form.intervalEnabled)} />
-              </div>
+              <div style={{ paddingTop: 26 }}><FieldToggle enabled={form.intervalEnabled} onToggle={() => set('intervalEnabled', !form.intervalEnabled)} /></div>
               <div style={{ flex: 1 }}>
                 <label style={labelStyle}>Interval (s)</label>
-                <input
-                  style={form.intervalEnabled ? inputStyle : disabledInputStyle}
-                  type="number" min={1}
-                  value={form.interval}
-                  onChange={e => set('interval', e.target.value)}
-                  disabled={!form.intervalEnabled}
-                />
+                <input style={form.intervalEnabled ? inputStyle : disabledInputStyle} type="number" min={1} value={form.interval} onChange={e => set('interval', e.target.value)} disabled={!form.intervalEnabled} />
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-              <div style={{ paddingTop: 26 }}>
-                <FieldToggle enabled={form.timeoutEnabled} onToggle={() => set('timeoutEnabled', !form.timeoutEnabled)} />
-              </div>
+              <div style={{ paddingTop: 26 }}><FieldToggle enabled={form.timeoutEnabled} onToggle={() => set('timeoutEnabled', !form.timeoutEnabled)} /></div>
               <div style={{ flex: 1 }}>
                 <label style={labelStyle}>Timeout (s)</label>
-                <input
-                  style={form.timeoutEnabled ? inputStyle : disabledInputStyle}
-                  type="number" min={1}
-                  value={form.timeout}
-                  onChange={e => set('timeout', e.target.value)}
-                  disabled={!form.timeoutEnabled}
-                />
+                <input style={form.timeoutEnabled ? inputStyle : disabledInputStyle} type="number" min={1} value={form.timeout} onChange={e => set('timeout', e.target.value)} disabled={!form.timeoutEnabled} />
               </div>
             </div>
           </div>
 
-          {/* Expected Status + Max Retries */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-              <div style={{ paddingTop: 26 }}>
-                <FieldToggle enabled={form.expectedStatusEnabled} onToggle={() => set('expectedStatusEnabled', !form.expectedStatusEnabled)} />
-              </div>
+              <div style={{ paddingTop: 26 }}><FieldToggle enabled={form.expectedStatusEnabled} onToggle={() => set('expectedStatusEnabled', !form.expectedStatusEnabled)} /></div>
               <div style={{ flex: 1 }}>
                 <label style={labelStyle}>Expected Status</label>
-                <input
-                  style={form.expectedStatusEnabled ? inputStyle : disabledInputStyle}
-                  type="number" min={100}
-                  value={form.expected_status}
-                  onChange={e => set('expected_status', e.target.value)}
-                  disabled={!form.expectedStatusEnabled}
-                />
+                <input style={form.expectedStatusEnabled ? inputStyle : disabledInputStyle} type="number" min={100} value={form.expected_status} onChange={e => set('expected_status', e.target.value)} disabled={!form.expectedStatusEnabled} />
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-              <div style={{ paddingTop: 26 }}>
-                <FieldToggle enabled={form.maxRetriesEnabled} onToggle={() => set('maxRetriesEnabled', !form.maxRetriesEnabled)} />
-              </div>
+              <div style={{ paddingTop: 26 }}><FieldToggle enabled={form.maxRetriesEnabled} onToggle={() => set('maxRetriesEnabled', !form.maxRetriesEnabled)} /></div>
               <div style={{ flex: 1 }}>
                 <label style={labelStyle}>Max Retries</label>
-                <input
-                  style={form.maxRetriesEnabled ? inputStyle : disabledInputStyle}
-                  type="number" min={0}
-                  value={form.max_retries}
-                  onChange={e => set('max_retries', e.target.value)}
-                  disabled={!form.maxRetriesEnabled}
-                />
+                <input style={form.maxRetriesEnabled ? inputStyle : disabledInputStyle} type="number" min={0} value={form.max_retries} onChange={e => set('max_retries', e.target.value)} disabled={!form.maxRetriesEnabled} />
               </div>
             </div>
           </div>
 
-          {/* Group */}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-            <div style={{ paddingTop: 26 }}>
-              <FieldToggle enabled={form.groupNameEnabled} onToggle={() => set('groupNameEnabled', !form.groupNameEnabled)} />
-            </div>
+            <div style={{ paddingTop: 26 }}><FieldToggle enabled={form.groupNameEnabled} onToggle={() => set('groupNameEnabled', !form.groupNameEnabled)} /></div>
             <div style={{ flex: 1 }}>
               <label style={labelStyle}>Group</label>
-              {form.groupNameEnabled ? (
-                <GroupInput
-                  value={form.group_name}
-                  onChange={v => set('group_name', v)}
-                  groups={groups}
-                  inputStyle={inputStyle}
-                />
-              ) : (
-                <input style={disabledInputStyle} value={form.group_name} disabled placeholder="e.g. Production, API, Frontend…" />
-              )}
+              {form.groupNameEnabled
+                ? <GroupInput value={form.group_name} onChange={v => set('group_name', v)} groups={groups} inputStyle={inputStyle} />
+                : <input style={disabledInputStyle} value={form.group_name} disabled placeholder="e.g. Production, API, Frontend…" />
+              }
             </div>
           </div>
 
-          {/* Labels */}
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-            <div style={{ paddingTop: 26 }}>
-              <FieldToggle enabled={form.labelsEnabled} onToggle={() => set('labelsEnabled', !form.labelsEnabled)} />
-            </div>
+            <div style={{ paddingTop: 26 }}><FieldToggle enabled={form.labelsEnabled} onToggle={() => set('labelsEnabled', !form.labelsEnabled)} /></div>
             <div style={{ flex: 1 }}>
               <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gap: 5 }}>
                 <Tag size={11} />Labels
-                {form.labelsEnabled && (
-                  <span style={{ fontSize: 11, color: '#e53e3e', fontWeight: 400 }}>— will replace existing labels</span>
-                )}
+                {form.labelsEnabled && <span style={{ fontSize: 11, color: '#e53e3e', fontWeight: 400 }}>— will replace existing labels</span>}
               </label>
-              {form.labelsEnabled ? (
-                <LabelsInput value={form.labels} onChange={v => set('labels', v)} inputStyle={inputStyle} />
-              ) : (
-                <div style={{ ...disabledInputStyle, minHeight: 38, display: 'flex', alignItems: 'center' }}>
-                  <span style={{ fontSize: 12, color: 'var(--color-text-faint)' }}>Add labels (press Enter or comma)</span>
-                </div>
-              )}
+              {form.labelsEnabled
+                ? <LabelsInput value={form.labels} onChange={v => set('labels', v)} inputStyle={inputStyle} />
+                : <div style={{ ...disabledInputStyle, minHeight: 38, display: 'flex', alignItems: 'center' }}><span style={{ fontSize: 12, color: 'var(--color-text-faint)' }}>Add labels (press Enter or comma)</span></div>
+              }
             </div>
           </div>
         </div>
 
-        {/* footer */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '14px 20px', borderTop: '1px solid #222' }}>
-          <button
-            onClick={onClose}
-            style={{ background: 'none', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 13, padding: '7px 16px', cursor: 'pointer' }}
-          >
-            Cancel
-          </button>
+          <button onClick={onClose} style={{ background: 'none', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 13, padding: '7px 16px', cursor: 'pointer' }}>Cancel</button>
           <button
             onClick={handleSave}
             disabled={loading || !anyEnabled || numericInvalid}
-            style={{
-              background: loading ? '#8B1A1A' : '#e53e3e', border: 'none', borderRadius: 6,
-              color: '#fff', fontSize: 13, fontWeight: 500,
-              padding: '7px 20px', cursor: loading ? 'not-allowed' : 'pointer',
-              display: 'flex', alignItems: 'center', gap: 6,
-              opacity: !anyEnabled || numericInvalid ? 0.4 : 1,
-            }}
+            style={{ background: loading ? '#8B1A1A' : '#e53e3e', border: 'none', borderRadius: 6, color: '#fff', fontSize: 13, fontWeight: 500, padding: '7px 20px', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: !anyEnabled || numericInvalid ? 0.4 : 1 }}
           >
-            {loading
-              ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} />
-              : <Edit2 size={13} />}
+            {loading ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Edit2 size={13} />}
             Apply to {count} monitor{count !== 1 ? 's' : ''}
           </button>
         </div>
@@ -845,37 +747,20 @@ function RowMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => voi
         onClick={() => setOpen(o => !o)}
         style={{
           background: open ? 'var(--color-surface-hover)' : 'transparent',
-          border: '1px solid transparent',
-          borderRadius: '50%',
-          cursor: 'pointer',
-          color: 'var(--color-text-muted)',
-          width: 28, height: 28,
+          border: '1px solid transparent', borderRadius: '50%', cursor: 'pointer',
+          color: 'var(--color-text-muted)', width: 28, height: 28,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           transition: 'background 0.15s, color 0.15s',
         }}
-        onMouseEnter={e => {
-          if (!open) {
-            (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-surface-hover)'
-            ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-secondary)'
-          }
-        }}
-        onMouseLeave={e => {
-          if (!open) {
-            (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
-            ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-muted)'
-          }
-        }}
+        onMouseEnter={e => { if (!open) { (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-surface-hover)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-secondary)' } }}
+        onMouseLeave={e => { if (!open) { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-muted)' } }}
       >
         <MoreVertical size={14} />
       </button>
       {open && (
         <>
           <div style={{ position: 'fixed', inset: 0, zIndex: 9 }} onClick={() => setOpen(false)} />
-          <div style={{
-            position: 'absolute', right: 0, top: 24, zIndex: 10,
-            background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 6,
-            minWidth: 130, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-          }}>
+          <div style={{ position: 'absolute', right: 0, top: 24, zIndex: 10, background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 6, minWidth: 130, overflow: 'hidden', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
             <button onClick={() => { onEdit(); setOpen(false) }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 14px', background: 'none', border: 'none', color: 'var(--color-text)', fontSize: 12, cursor: 'pointer', textAlign: 'left' }}>
               <Pencil size={12} color="#888" /> Edit
             </button>
@@ -889,8 +774,8 @@ function RowMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => voi
   )
 }
 
-// ── Column widths ────────────────────────────────────────────────────────────
-// Checkbox | Star | Monitor | Status | Uptime | Interval | Last Check | Next Check | Public | History | Actions
+// ── Column widths ─────────────────────────────────────────────────────────────
+
 const COL_WIDTHS = ['36px', '28px', 'auto', '100px', '80px', '76px', '100px', '140px', '80px', '84px', '60px']
 
 function TableColGroup() {
@@ -904,10 +789,8 @@ function TableColGroup() {
 // ── Checkbox cell ─────────────────────────────────────────────────────────────
 
 function CheckboxCell({ checked, onChange, indeterminate = false }: { checked: boolean; onChange: () => void; indeterminate?: boolean }) {
-  const ref = useRef<HTMLButtonElement>(null)
   return (
     <button
-      ref={ref}
       onClick={onChange}
       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', color: checked ? '#e53e3e' : '#3a3a3a', display: 'flex', alignItems: 'center' }}
     >
@@ -920,17 +803,92 @@ function CheckboxCell({ checked, onChange, indeterminate = false }: { checked: b
   )
 }
 
-// ── Group section ─────────────────────────────────────────────────────────────
+// ── Monitor card (mobile) ─────────────────────────────────────────────────────
 
-function GroupSection({
-  groupName,
-  monitors,
-  selectedIds,
+function MonitorCardMobile({
+  m,
+  selected,
   onToggleSelect,
   onEdit,
   onDelete,
-  visibilityMutation,
+  visibilityMutation: _visibilityMutation,
   favoriteMutation,
+}: {
+  m: Monitor
+  selected: boolean
+  onToggleSelect: () => void
+  onEdit: (m: Monitor) => void
+  onDelete: (id: number) => void
+  visibilityMutation: ReturnType<typeof useToggleVisibility>
+  favoriteMutation: ReturnType<typeof useToggleFavorite>
+}) {
+  return (
+    <div style={{
+      padding: '12px 16px',
+      borderBottom: '1px solid var(--color-row-divider)',
+      background: selected ? 'rgba(229,62,62,0.04)' : undefined,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+        {/* checkbox */}
+        <div style={{ paddingTop: 2, flexShrink: 0 }}>
+          <CheckboxCell checked={selected} onChange={onToggleSelect} />
+        </div>
+
+        {/* main content */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+            <StatusBadge status={m.status} />
+            <span style={{ fontSize: 13, color: 'var(--color-text)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60vw' }}>
+              {m.name}
+            </span>
+            {m.ssl_expiry_date && m.url.toLowerCase().startsWith('https://') && (
+              <SSLBadge expiryDate={m.ssl_expiry_date} warningDays={m.ssl_warning_days} />
+            )}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-dim)', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {m.url}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
+            <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+              {m.uptime_percentage === 100 ? '100%' : `${m.uptime_percentage.toFixed(2)}%`} uptime
+            </span>
+            {m.last_response_time != null && (
+              <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{m.last_response_time}ms</span>
+            )}
+            <span style={{ fontSize: 11, color: 'var(--color-text-dim)' }}>
+              {m.interval >= 3600 ? `${m.interval / 3600}h` : m.interval >= 60 ? `${m.interval / 60}m` : `${m.interval}s`} interval
+            </span>
+            {m.last_checked_at && (
+              <span style={{ fontSize: 11, color: 'var(--color-text-dim)' }}>{timeAgo(m.last_checked_at)}</span>
+            )}
+          </div>
+          {m.labels.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {m.labels.map(l => <LabelChip key={l} label={l} />)}
+            </div>
+          )}
+        </div>
+
+        {/* actions */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+          <button
+            onClick={() => favoriteMutation.mutate({ id: m.id, favorite: !m.favorite })}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', color: m.favorite ? '#f6ad55' : '#333', display: 'flex', alignItems: 'center' }}
+          >
+            <Star size={13} fill={m.favorite ? '#f6ad55' : 'none'} />
+          </button>
+          <RowMenu onEdit={() => onEdit(m)} onDelete={() => onDelete(m.id)} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Group section ─────────────────────────────────────────────────────────────
+
+function GroupSection({
+  groupName, monitors, selectedIds, onToggleSelect, onEdit, onDelete,
+  visibilityMutation, favoriteMutation, isMobile,
 }: {
   groupName: string
   monitors: Monitor[]
@@ -940,6 +898,7 @@ function GroupSection({
   onDelete: (id: number) => void
   visibilityMutation: ReturnType<typeof useToggleVisibility>
   favoriteMutation: ReturnType<typeof useToggleFavorite>
+  isMobile: boolean
 }) {
   const [collapsed, setCollapsed] = useState(false)
 
@@ -949,96 +908,74 @@ function GroupSection({
   const someSelected = monitors.some(m => selectedIds.has(m.id))
 
   function toggleGroupSelect() {
-    if (allSelected) {
-      monitors.forEach(m => selectedIds.has(m.id) && onToggleSelect(m.id))
-    } else {
-      monitors.forEach(m => !selectedIds.has(m.id) && onToggleSelect(m.id))
-    }
+    if (allSelected) monitors.forEach(m => selectedIds.has(m.id) && onToggleSelect(m.id))
+    else monitors.forEach(m => !selectedIds.has(m.id) && onToggleSelect(m.id))
   }
 
   return (
     <div>
-      {/* group header row */}
-      <div style={{
-        display: 'flex', alignItems: 'center',
-        padding: '8px 16px 8px 0', cursor: 'pointer',
-        background: 'var(--color-surface-2)', borderBottom: collapsed ? 'none' : '1px solid var(--color-row-divider)',
-        userSelect: 'none',
-      }}>
-        {/* group checkbox — width matches the 36px checkbox column, padding matches MonitorRow checkbox cell */}
-        <div
-          onClick={e => e.stopPropagation()}
-          style={{ width: 36, flexShrink: 0, display: 'flex', alignItems: 'center', paddingLeft: 12 }}
-        >
-          <CheckboxCell
-            checked={allSelected}
-            indeterminate={!allSelected && someSelected}
-            onChange={toggleGroupSelect}
-          />
+      <div style={{ display: 'flex', alignItems: 'center', padding: '8px 16px 8px 0', cursor: 'pointer', background: 'var(--color-surface-2)', borderBottom: collapsed ? 'none' : '1px solid var(--color-row-divider)', userSelect: 'none' }}>
+        <div onClick={e => e.stopPropagation()} style={{ width: 36, flexShrink: 0, display: 'flex', alignItems: 'center', paddingLeft: 12 }}>
+          <CheckboxCell checked={allSelected} indeterminate={!allSelected && someSelected} onChange={toggleGroupSelect} />
         </div>
-        {/* star column spacer */}
-        <div style={{ width: 28, flexShrink: 0 }} />
+        {!isMobile && <div style={{ width: 28, flexShrink: 0 }} />}
         <div onClick={() => setCollapsed(c => !c)} style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
           {collapsed ? <ChevronRight size={12} color="#555" /> : <ChevronDown size={12} color="#555" />}
           <Layers size={12} color="#555" />
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)' }}>{groupName}</span>
           <span style={{ fontSize: 11, color: 'var(--color-text-faint)' }}>{monitors.length} monitor{monitors.length !== 1 ? 's' : ''}</span>
-          {downCount > 0 ? (
-            <span style={{ fontSize: 10, color: '#e53e3e', background: 'rgba(229,62,62,0.12)', padding: '1px 6px', borderRadius: 8 }}>
-              {downCount} down
-            </span>
-          ) : (
-            <span style={{ fontSize: 10, color: '#48bb78', background: 'rgba(72,187,120,0.1)', padding: '1px 6px', borderRadius: 8 }}>
-              {upCount} up
-            </span>
-          )}
+          {downCount > 0
+            ? <span style={{ fontSize: 10, color: '#e53e3e', background: 'rgba(229,62,62,0.12)', padding: '1px 6px', borderRadius: 8 }}>{downCount} down</span>
+            : <span style={{ fontSize: 10, color: '#48bb78', background: 'rgba(72,187,120,0.1)', padding: '1px 6px', borderRadius: 8 }}>{upCount} up</span>
+          }
         </div>
       </div>
 
       {!collapsed && (
-        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
-          <TableColGroup />
-          <tbody>
-            {monitors.map((m, idx) => (
-              <MonitorRow
+        isMobile ? (
+          <div>
+            {monitors.map(m => (
+              <MonitorCardMobile
                 key={m.id}
                 m={m}
-                isLast={idx === monitors.length - 1}
                 selected={selectedIds.has(m.id)}
                 onToggleSelect={() => onToggleSelect(m.id)}
                 onEdit={onEdit}
                 onDelete={onDelete}
                 visibilityMutation={visibilityMutation}
                 favoriteMutation={favoriteMutation}
-                indent
               />
             ))}
-          </tbody>
-        </table>
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+            <TableColGroup />
+            <tbody>
+              {monitors.map((m, idx) => (
+                <MonitorRow
+                  key={m.id} m={m} isLast={idx === monitors.length - 1}
+                  selected={selectedIds.has(m.id)} onToggleSelect={() => onToggleSelect(m.id)}
+                  onEdit={onEdit} onDelete={onDelete}
+                  visibilityMutation={visibilityMutation} favoriteMutation={favoriteMutation}
+                  indent
+                />
+              ))}
+            </tbody>
+          </table>
+        )
       )}
     </div>
   )
 }
 
-// ── Monitor row ───────────────────────────────────────────────────────────────
+// ── Monitor row (desktop) ─────────────────────────────────────────────────────
 
 function MonitorRow({
-  m,
-  isLast,
-  selected,
-  onToggleSelect,
-  onEdit,
-  onDelete,
-  visibilityMutation,
-  favoriteMutation,
-  indent = false,
+  m, isLast, selected, onToggleSelect, onEdit, onDelete,
+  visibilityMutation, favoriteMutation, indent = false,
 }: {
-  m: Monitor
-  isLast: boolean
-  selected: boolean
-  onToggleSelect: () => void
-  onEdit: (m: Monitor) => void
-  onDelete: (id: number) => void
+  m: Monitor; isLast: boolean; selected: boolean
+  onToggleSelect: () => void; onEdit: (m: Monitor) => void; onDelete: (id: number) => void
   visibilityMutation: ReturnType<typeof useToggleVisibility>
   favoriteMutation: ReturnType<typeof useToggleFavorite>
   indent?: boolean
@@ -1046,26 +983,12 @@ function MonitorRow({
   const bars = Array(14).fill(m.status === 'pending' ? 'up' : m.status) as MonitorStatus[]
 
   return (
-    <tr style={{
-      borderBottom: isLast ? 'none' : '1px solid var(--color-row-divider)',
-      background: selected ? 'rgba(229,62,62,0.04)' : undefined,
-    }}>
-      {/* checkbox */}
+    <tr style={{ borderBottom: isLast ? 'none' : '1px solid var(--color-row-divider)', background: selected ? 'rgba(229,62,62,0.04)' : undefined }}>
       <td style={{ padding: '11px 4px 11px 12px' }}>
         <CheckboxCell checked={selected} onChange={onToggleSelect} />
       </td>
-      {/* star / favorite */}
       <td style={{ padding: '0 0 0 2px' }}>
-        <button
-          onClick={() => favoriteMutation.mutate({ id: m.id, favorite: !m.favorite })}
-          title={m.favorite ? 'Remove from favorites' : 'Add to favorites'}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px',
-            color: m.favorite ? '#f6ad55' : '#333',
-            display: 'flex', alignItems: 'center',
-            transition: 'color 0.15s',
-          }}
-        >
+        <button onClick={() => favoriteMutation.mutate({ id: m.id, favorite: !m.favorite })} title={m.favorite ? 'Remove from favorites' : 'Add to favorites'} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', color: m.favorite ? '#f6ad55' : '#333', display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}>
           <Star size={13} fill={m.favorite ? '#f6ad55' : 'none'} />
         </button>
       </td>
@@ -1087,9 +1010,7 @@ function MonitorRow({
           </div>
         </div>
       </td>
-      <td style={{ padding: '11px 20px' }}>
-        <StatusBadge status={m.status} />
-      </td>
+      <td style={{ padding: '11px 20px' }}><StatusBadge status={m.status} /></td>
       <td style={{ padding: '11px 20px', fontSize: 13, color: 'var(--color-text)' }}>
         {m.uptime_percentage === 100 ? '100%' : `${m.uptime_percentage.toFixed(2)}%`}
       </td>
@@ -1099,41 +1020,24 @@ function MonitorRow({
       <td style={{ padding: '11px 20px', fontSize: 12, color: 'var(--color-text-muted)' }}>
         {m.last_checked_at ? timeAgo(m.last_checked_at) : '—'}
       </td>
-      <td style={{ padding: '11px 20px' }}>
-        <NextCheckBar lastCheckedAt={m.last_checked_at} intervalSeconds={m.interval} />
-      </td>
+      <td style={{ padding: '11px 20px' }}><NextCheckBar lastCheckedAt={m.last_checked_at} intervalSeconds={m.interval} /></td>
       <td style={{ padding: '11px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div
             onClick={() => visibilityMutation.mutate({ id: m.id, isPublic: !m.public })}
             title={m.public ? 'Make private' : 'Make public'}
-            style={{
-              width: 32, height: 18, borderRadius: 9, cursor: 'pointer',
-              background: m.public ? '#e53e3e' : '#2a2a2a',
-              position: 'relative', transition: 'background 0.2s', flexShrink: 0,
-            }}
+            style={{ width: 32, height: 18, borderRadius: 9, cursor: 'pointer', background: m.public ? '#e53e3e' : '#2a2a2a', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}
           >
-            <div style={{
-              width: 12, height: 12, borderRadius: '50%', background: '#fff',
-              position: 'absolute', top: 3,
-              left: m.public ? 17 : 3, transition: 'left 0.2s',
-            }} />
+            <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: m.public ? 17 : 3, transition: 'left 0.2s' }} />
           </div>
           {m.public && m.public_slug && (
-            <a
-              href={m.group_name ? `/status/group/${m.group_name.toLowerCase().replace(/\s+/g, '-')}` : '/status'}
-              target="_blank"
-              rel="noreferrer"
-              style={{ color: 'var(--color-text-dim)', display: 'flex' }}
-            >
+            <a href={m.group_name ? `/status/group/${m.group_name.toLowerCase().replace(/\s+/g, '-')}` : '/status'} target="_blank" rel="noreferrer" style={{ color: 'var(--color-text-dim)', display: 'flex' }}>
               <ExternalLink size={11} />
             </a>
           )}
         </div>
       </td>
-      <td style={{ padding: '11px 20px' }}>
-        <MiniSparkline data={bars} width={56} height={18} />
-      </td>
+      <td style={{ padding: '11px 20px' }}><MiniSparkline data={bars} width={56} height={18} /></td>
       <td style={{ padding: '11px 20px 11px 8px' }}>
         <RowMenu onEdit={() => onEdit(m)} onDelete={() => onDelete(m.id)} />
       </td>
@@ -1141,10 +1045,107 @@ function MonitorRow({
   )
 }
 
+// ── Filter sidebar content (shared between desktop sidebar and mobile drawer) ─
+
+function FilterSidebarContent({
+  monitors,
+  groups,
+  allLabels,
+  groupFilter,
+  setGroupFilter,
+  labelFilter,
+  setLabelFilter,
+  onClose,
+}: {
+  monitors: Monitor[]
+  groups: string[]
+  allLabels: string[]
+  groupFilter: string | null
+  setGroupFilter: (g: string | null) => void
+  labelFilter: string | null
+  setLabelFilter: (l: string | null) => void
+  onClose?: () => void
+}) {
+  const hasGroups = groups.length > 0
+  const hasLabels = allLabels.length > 0
+
+  return (
+    <>
+      {onClose && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Filters</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-dim)', display: 'flex' }}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {hasGroups && (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 11, color: 'var(--color-text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Layers size={11} />Groups
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <button
+              onClick={() => { setGroupFilter(null); onClose?.() }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderRadius: 5, border: 'none', cursor: 'pointer', background: groupFilter === null ? 'var(--color-surface-hover)' : 'transparent', color: groupFilter === null ? 'var(--color-text)' : 'var(--color-text-muted)', fontSize: 12, textAlign: 'left' }}
+            >
+              <span>All groups</span>
+              <span style={{ fontSize: 11, color: 'var(--color-text-faint)' }}>{monitors.length}</span>
+            </button>
+            {groups.map(g => (
+              <button
+                key={g}
+                onClick={() => { setGroupFilter(groupFilter === g ? null : g); onClose?.() }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderRadius: 5, border: 'none', cursor: 'pointer', background: groupFilter === g ? 'var(--color-surface-hover)' : 'transparent', color: groupFilter === g ? 'var(--color-text)' : 'var(--color-text-muted)', fontSize: 12, textAlign: 'left' }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Layers size={10} color={groupFilter === g ? '#e53e3e' : '#444'} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 100 }}>{g}</span>
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-faint)' }}>{monitors.filter(m => m.group_name === g).length}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {hasLabels && (
+        <div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Tag size={11} />Labels
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {allLabels.map(l => {
+              const color = labelColor(l)
+              const active = labelFilter === l
+              return (
+                <button
+                  key={l}
+                  onClick={() => { setLabelFilter(labelFilter === l ? null : l); onClose?.() }}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 10px', borderRadius: 5, border: 'none', cursor: 'pointer', background: active ? `${color}15` : 'transparent', textAlign: 'left' }}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: active ? color : '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 100 }}>{l}</span>
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-faint)' }}>{monitors.filter(m => m.labels.includes(l)).length}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Monitors() {
   const navigate = useNavigate()
+  const { isMobile } = useBreakpoint()
+
   const { data: monitors = [], isLoading, refetch } = useMonitors()
   const { data: groups = [] } = useGroups()
   const createMutation = useCreateMonitor()
@@ -1163,8 +1164,8 @@ export default function Monitors() {
   const [modal, setModal] = useState<{ open: boolean; monitor?: Monitor }>({ open: false })
   const [bulkModal, setBulkModal] = useState(false)
   const [viewMode, setViewMode] = useState<'flat' | 'grouped'>('grouped')
+  const [filterDrawerOpen, setFilterDrawerOpen] = useState(false)
 
-  // ── Selection state ──────────────────────────────────────────────────────
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
 
   function toggleSelect(id: number) {
@@ -1175,7 +1176,6 @@ export default function Monitors() {
     })
   }
 
-  // Collect all unique labels across monitors
   const allLabels = Array.from(new Set(monitors.flatMap(m => m.labels))).sort()
 
   const filtered = monitors.filter(m => {
@@ -1192,27 +1192,17 @@ export default function Monitors() {
     return matchSearch && matchStatus && matchGroup && matchLabel
   })
 
-  // Select-all for currently visible monitors
   const allFilteredSelected = filtered.length > 0 && filtered.every(m => selectedIds.has(m.id))
   const someFilteredSelected = filtered.some(m => selectedIds.has(m.id))
 
   function toggleSelectAll() {
     if (allFilteredSelected) {
-      setSelectedIds(prev => {
-        const next = new Set(prev)
-        filtered.forEach(m => next.delete(m.id))
-        return next
-      })
+      setSelectedIds(prev => { const next = new Set(prev); filtered.forEach(m => next.delete(m.id)); return next })
     } else {
-      setSelectedIds(prev => {
-        const next = new Set(prev)
-        filtered.forEach(m => next.add(m.id))
-        return next
-      })
+      setSelectedIds(prev => { const next = new Set(prev); filtered.forEach(m => next.add(m.id)); return next })
     }
   }
 
-  // Group monitors for grouped view
   const grouped: Record<string, Monitor[]> = {}
   const ungrouped: Monitor[] = []
   for (const m of filtered) {
@@ -1225,11 +1215,8 @@ export default function Monitors() {
   }
 
   async function handleSave(payload: CreateMonitorPayload) {
-    if (modal.monitor) {
-      await updateMutation.mutateAsync({ id: modal.monitor.id, payload })
-    } else {
-      await createMutation.mutateAsync(payload)
-    }
+    if (modal.monitor) await updateMutation.mutateAsync({ id: modal.monitor.id, payload })
+    else await createMutation.mutateAsync(payload)
     setModal({ open: false })
   }
 
@@ -1252,9 +1239,7 @@ export default function Monitors() {
 
   const mutating = createMutation.isPending || updateMutation.isPending
   const selectedCount = selectedIds.size
-  const allSelectedFavorited = selectedCount > 0 && monitors
-    .filter(m => selectedIds.has(m.id))
-    .every(m => m.favorite)
+  const allSelectedFavorited = selectedCount > 0 && monitors.filter(m => selectedIds.has(m.id)).every(m => m.favorite)
 
   const statusTabs: Array<{ value: MonitorStatus | 'all'; label: string; color?: string }> = [
     { value: 'all',      label: 'All' },
@@ -1264,132 +1249,88 @@ export default function Monitors() {
   ]
 
   const hasGroups = groups.length > 0
-  const hasLabels = allLabels.length > 0
-
+  const hasFilters = hasGroups || allLabels.length > 0
   const tableHeaders = ['', '', 'Monitor', 'Status', 'Uptime', 'Interval', 'Last Check', 'Next Check', 'Public', 'History', '']
 
+  const activeFiltersCount = (groupFilter ? 1 : 0) + (labelFilter ? 1 : 0)
+
   return (
-    <div style={{ padding: '20px 24px', display: 'flex', gap: 16 }}>
+    <div className="monitors-layout">
 
-      {/* ── Sidebar: group + label filters ── */}
-      {(hasGroups || hasLabels) && (
-        <div style={{ width: 180, flexShrink: 0 }}>
-          {hasGroups && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 11, color: 'var(--color-text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
-                <Layers size={11} />Groups
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <button
-                  onClick={() => setGroupFilter(null)}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '6px 10px', borderRadius: 5, border: 'none', cursor: 'pointer',
-                    background: groupFilter === null ? 'var(--color-surface-hover)' : 'transparent',
-                    color: groupFilter === null ? 'var(--color-text)' : 'var(--color-text-muted)',
-                    fontSize: 12, textAlign: 'left',
-                  }}
-                >
-                  <span>All groups</span>
-                  <span style={{ fontSize: 11, color: 'var(--color-text-faint)' }}>{monitors.length}</span>
-                </button>
-                {groups.map(g => (
-                  <button
-                    key={g}
-                    onClick={() => setGroupFilter(gf => gf === g ? null : g)}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '6px 10px', borderRadius: 5, border: 'none', cursor: 'pointer',
-                      background: groupFilter === g ? 'var(--color-surface-hover)' : 'transparent',
-                      color: groupFilter === g ? 'var(--color-text)' : 'var(--color-text-muted)',
-                      fontSize: 12, textAlign: 'left',
-                    }}
-                  >
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Layers size={10} color={groupFilter === g ? '#e53e3e' : '#444'} />
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 100 }}>{g}</span>
-                    </span>
-                    <span style={{ fontSize: 11, color: 'var(--color-text-faint)' }}>
-                      {monitors.filter(m => m.group_name === g).length}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {hasLabels && (
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
-                <Tag size={11} />Labels
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {allLabels.map(l => {
-                  const color = labelColor(l)
-                  const active = labelFilter === l
-                  return (
-                    <button
-                      key={l}
-                      onClick={() => setLabelFilter(lf => lf === l ? null : l)}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '5px 10px', borderRadius: 5, border: 'none', cursor: 'pointer',
-                        background: active ? `${color}15` : 'transparent',
-                        textAlign: 'left',
-                      }}
-                    >
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0 }} />
-                        <span style={{ fontSize: 12, color: active ? color : '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 100 }}>{l}</span>
-                      </span>
-                      <span style={{ fontSize: 11, color: 'var(--color-text-faint)' }}>
-                        {monitors.filter(m => m.labels.includes(l)).length}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+      {/* ── Desktop filter sidebar ── */}
+      {hasFilters && (
+        <div className="monitors-filter-sidebar">
+          <FilterSidebarContent
+            monitors={monitors}
+            groups={groups}
+            allLabels={allLabels}
+            groupFilter={groupFilter}
+            setGroupFilter={setGroupFilter}
+            labelFilter={labelFilter}
+            setLabelFilter={setLabelFilter}
+          />
         </div>
+      )}
+
+      {/* ── Mobile filter drawer ── */}
+      {filterDrawerOpen && (
+        <>
+          <div className="filter-drawer-overlay" onClick={() => setFilterDrawerOpen(false)} />
+          <div className="filter-drawer">
+            <FilterSidebarContent
+              monitors={monitors}
+              groups={groups}
+              allLabels={allLabels}
+              groupFilter={groupFilter}
+              setGroupFilter={setGroupFilter}
+              labelFilter={labelFilter}
+              setLabelFilter={setLabelFilter}
+              onClose={() => setFilterDrawerOpen(false)}
+            />
+          </div>
+        </>
       )}
 
       {/* ── Main content ── */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        {/* header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+
+        {/* Header */}
+        <div className="monitors-header">
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 600, color: 'var(--color-text)', marginBottom: 2 }}>Monitors</h1>
             <p style={{ fontSize: 12, color: 'var(--color-text-dim)' }}>{monitors.length} monitors configured</p>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <a
-              href="/status"
-              target="_blank"
-              rel="noreferrer"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 12, padding: '6px 10px', textDecoration: 'none' }}
-            >
-              <Globe size={13} /> Public Page
+          <div className="monitors-header-actions" style={{ display: 'flex', gap: 8 }}>
+            {/* Mobile: filter button */}
+            {isMobile && hasFilters && (
+              <button
+                onClick={() => setFilterDrawerOpen(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: activeFiltersCount > 0 ? 'rgba(229,62,62,0.1)' : 'var(--color-surface)', border: `1px solid ${activeFiltersCount > 0 ? '#e53e3e' : 'var(--color-border)'}`, borderRadius: 6, color: activeFiltersCount > 0 ? '#e53e3e' : 'var(--color-text-muted)', fontSize: 12, padding: '6px 10px', cursor: 'pointer' }}
+              >
+                <SlidersHorizontal size={13} />
+                Filters{activeFiltersCount > 0 ? ` (${activeFiltersCount})` : ''}
+              </button>
+            )}
+            <a href="/status" target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 12, padding: '6px 10px', textDecoration: 'none' }}>
+              <Globe size={13} />{!isMobile && ' Public Page'}
             </a>
-            <button
-              onClick={() => showURLMutation.mutate(!showURL)}
-              title={showURL ? 'Hide URLs on public page' : 'Show URLs on public page'}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6,
-                color: showURL ? '#4299e1' : '#555', fontSize: 12, padding: '6px 10px', cursor: 'pointer',
-              }}
-            >
-              <ExternalLink size={13} />
-              {showURL ? 'Hide URL' : 'Show URL'}
-            </button>
-            <button
-              onClick={() => navigate('/settings?tab=groups-labels')}
-              title="Manage groups and labels"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 12, padding: '6px 10px', cursor: 'pointer' }}
-            >
-              <FolderOpen size={13} /> Manage Groups & Labels
-            </button>
+            {!isMobile && (
+              <button
+                onClick={() => showURLMutation.mutate(!showURL)}
+                title={showURL ? 'Hide URLs on public page' : 'Show URLs on public page'}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: showURL ? '#4299e1' : '#555', fontSize: 12, padding: '6px 10px', cursor: 'pointer' }}
+              >
+                <ExternalLink size={13} />{showURL ? 'Hide URL' : 'Show URL'}
+              </button>
+            )}
+            {!isMobile && (
+              <button
+                onClick={() => navigate('/settings?tab=groups-labels')}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 12, padding: '6px 10px', cursor: 'pointer' }}
+              >
+                <FolderOpen size={13} /> Manage Groups & Labels
+              </button>
+            )}
             <button
               onClick={() => refetch()}
               style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 12, padding: '6px 10px', cursor: 'pointer', lineHeight: 1 }}
@@ -1400,15 +1341,15 @@ export default function Monitors() {
               onClick={() => setModal({ open: true })}
               style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#e53e3e', border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 500, padding: '6px 14px', cursor: 'pointer' }}
             >
-              <Plus size={13} /> Add Monitor
-            </button>          </div>
+              <Plus size={13} />{!isMobile && ' Add Monitor'}
+            </button>
+          </div>
         </div>
 
         <Card>
-          {/* toolbar */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid var(--color-border-muted)', gap: 12, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              {/* status tabs */}
+          {/* Toolbar */}
+          <div className="monitors-toolbar">
+            <div className="monitors-toolbar-tabs" style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
               {statusTabs.map(tab => (
                 <button
                   key={tab.value}
@@ -1419,10 +1360,10 @@ export default function Monitors() {
                     background: statusFilter === tab.value ? 'var(--color-surface-hover)' : 'transparent',
                     color: statusFilter === tab.value ? (tab.color ?? 'var(--color-text)') : 'var(--color-text-muted)',
                     fontWeight: statusFilter === tab.value ? 500 : 400,
-                    display: 'flex', alignItems: 'center', gap: 5,
+                    display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
                   }}
                 >
-                  {tab.color && <span style={{ width: 6, height: 6, borderRadius: '50%', background: tab.color }} />}
+                  {tab.color && <span style={{ width: 6, height: 6, borderRadius: '50%', background: tab.color, flexShrink: 0 }} />}
                   {tab.label}
                   <span style={{ fontSize: 11, color: 'var(--color-text-muted)', marginLeft: 2 }}>
                     {tab.value === 'all' ? monitors.length : monitors.filter(m => m.status === tab.value).length}
@@ -1430,53 +1371,41 @@ export default function Monitors() {
                 </button>
               ))}
 
-              {/* divider */}
-              {hasGroups && <div style={{ width: 1, height: 18, background: 'var(--color-border)', margin: '0 4px' }} />}
-
-              {/* grouped toggle */}
-              {hasGroups && (
-                <button
-                  onClick={() => setViewMode(v => v === 'grouped' ? 'flat' : 'grouped')}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 5,
-                    padding: '5px 10px', borderRadius: 5, fontSize: 12, cursor: 'pointer',
-                    border: viewMode === 'grouped' ? '1px solid #3a3a3a' : '1px solid transparent',
-                    background: viewMode === 'grouped' ? 'var(--color-surface-hover)' : 'transparent',
-                    color: viewMode === 'grouped' ? 'var(--color-text)' : 'var(--color-text-muted)',
-                  }}
-                >
-                  <Layers size={11} />
-                  {viewMode === 'grouped' ? 'Grouped' : 'Flat'}
-                </button>
+              {hasGroups && !isMobile && (
+                <>
+                  <div style={{ width: 1, height: 18, background: 'var(--color-border)', margin: '0 4px' }} />
+                  <button
+                    onClick={() => setViewMode(v => v === 'grouped' ? 'flat' : 'grouped')}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 5, fontSize: 12, cursor: 'pointer', border: viewMode === 'grouped' ? '1px solid #3a3a3a' : '1px solid transparent', background: viewMode === 'grouped' ? 'var(--color-surface-hover)' : 'transparent', color: viewMode === 'grouped' ? 'var(--color-text)' : 'var(--color-text-muted)' }}
+                  >
+                    <Layers size={11} />{viewMode === 'grouped' ? 'Grouped' : 'Flat'}
+                  </button>
+                </>
               )}
 
-              {/* active filters */}
+              {/* Active filter badges */}
               {groupFilter && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--color-text)', background: 'var(--color-surface-hover)', border: '1px solid var(--color-border-active)', borderRadius: 5, padding: '4px 10px' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--color-text)', background: 'var(--color-surface-hover)', border: '1px solid var(--color-border-active)', borderRadius: 5, padding: '4px 10px', whiteSpace: 'nowrap' }}>
                   <Layers size={11} color="#e53e3e" />{groupFilter}
                   <button onClick={() => setGroupFilter(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-dim)', padding: 0, display: 'flex' }}><X size={11} /></button>
                 </span>
               )}
               {labelFilter && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, borderRadius: 5, padding: '4px 10px', background: `${labelColor(labelFilter)}18`, color: labelColor(labelFilter), border: `1px solid ${labelColor(labelFilter)}40` }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, borderRadius: 5, padding: '4px 10px', background: `${labelColor(labelFilter)}18`, color: labelColor(labelFilter), border: `1px solid ${labelColor(labelFilter)}40`, whiteSpace: 'nowrap' }}>
                   <Tag size={11} />{labelFilter}
                   <button onClick={() => setLabelFilter(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: labelColor(labelFilter), padding: 0, display: 'flex' }}><X size={11} /></button>
                 </span>
               )}
             </div>
 
-            {/* search */}
-            <div style={{ position: 'relative' }}>
+            {/* Search */}
+            <div className="monitors-toolbar-search" style={{ position: 'relative' }}>
               <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-dim)' }} />
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Search name, URL, group, label…"
-                style={{
-                  background: 'var(--color-input-bg)', border: '1px solid var(--color-border)', borderRadius: 6,
-                  color: 'var(--color-text)', fontSize: 12, padding: '6px 12px 6px 30px',
-                  outline: 'none', width: 240,
-                }}
+                style={{ background: 'var(--color-input-bg)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text)', fontSize: 12, padding: '6px 12px 6px 30px', outline: 'none', width: isMobile ? '100%' : 240 }}
               />
               {search && (
                 <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-dim)', padding: 0, display: 'flex' }}>
@@ -1486,68 +1415,101 @@ export default function Monitors() {
             </div>
           </div>
 
-          {/* ── Bulk action bar (visible when anything is selected) ── */}
+          {/* Bulk action bar */}
           {selectedCount > 0 && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '10px 16px', borderBottom: '1px solid var(--color-border-muted)',
-              background: 'rgba(229,62,62,0.06)',
-            }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--color-border-muted)', background: 'rgba(229,62,62,0.06)', flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12, color: 'var(--color-text)', fontWeight: 500 }}>
                 {selectedCount} monitor{selectedCount !== 1 ? 's' : ''} selected
               </span>
               <button
                 onClick={() => setBulkModal(true)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  background: '#e53e3e', border: 'none', borderRadius: 5,
-                  color: '#fff', fontSize: 12, fontWeight: 500,
-                  padding: '5px 12px', cursor: 'pointer',
-                }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#e53e3e', border: 'none', borderRadius: 5, color: '#fff', fontSize: 12, fontWeight: 500, padding: '5px 12px', cursor: 'pointer' }}
               >
                 <Edit2 size={12} /> Edit selected
               </button>
               <button
                 onClick={() => handleBulkFavorite(!allSelectedFavorited)}
                 disabled={bulkUpdateMutation.isPending}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  background: 'none',
-                  border: `1px solid ${allSelectedFavorited ? '#f6ad55' : '#3a3a3a'}`,
-                  borderRadius: 5,
-                  color: allSelectedFavorited ? '#f6ad55' : '#888',
-                  fontSize: 12, padding: '5px 10px', cursor: 'pointer',
-                }}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: `1px solid ${allSelectedFavorited ? '#f6ad55' : '#3a3a3a'}`, borderRadius: 5, color: allSelectedFavorited ? '#f6ad55' : '#888', fontSize: 12, padding: '5px 10px', cursor: 'pointer' }}
               >
                 <Star size={11} fill={allSelectedFavorited ? '#f6ad55' : 'none'} />
                 {allSelectedFavorited ? 'Unfavorite' : 'Favorite'}
               </button>
               <button
                 onClick={() => setSelectedIds(new Set())}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  background: 'none', border: '1px solid var(--color-border-active)', borderRadius: 5,
-                  color: 'var(--color-text-muted)', fontSize: 12, padding: '5px 10px', cursor: 'pointer',
-                }}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'none', border: '1px solid var(--color-border-active)', borderRadius: 5, color: 'var(--color-text-muted)', fontSize: 12, padding: '5px 10px', cursor: 'pointer' }}
               >
                 <X size={11} /> Deselect all
               </button>
             </div>
           )}
 
-          {/* table */}
-          {viewMode === 'flat' || !hasGroups ? (
+          {/* ── Table / Cards ── */}
+          {isMobile ? (
+            /* Mobile card view */
+            <div>
+              {filtered.length === 0 && (
+                <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-dim)', fontSize: 13 }}>
+                  {search || groupFilter || labelFilter ? 'No monitors match your filters' : 'No monitors yet. Add your first monitor.'}
+                </div>
+              )}
+              {viewMode === 'flat' || !hasGroups ? (
+                filtered.map(m => (
+                  <MonitorCardMobile
+                    key={m.id} m={m}
+                    selected={selectedIds.has(m.id)}
+                    onToggleSelect={() => toggleSelect(m.id)}
+                    onEdit={m => setModal({ open: true, monitor: m })}
+                    onDelete={handleDelete}
+                    visibilityMutation={visibilityMutation}
+                    favoriteMutation={favoriteMutation}
+                  />
+                ))
+              ) : (
+                <>
+                  {Object.entries(grouped).map(([group, items]) => (
+                    <GroupSection
+                      key={group} groupName={group} monitors={items}
+                      selectedIds={selectedIds} onToggleSelect={toggleSelect}
+                      onEdit={m => setModal({ open: true, monitor: m })}
+                      onDelete={handleDelete}
+                      visibilityMutation={visibilityMutation}
+                      favoriteMutation={favoriteMutation}
+                      isMobile
+                    />
+                  ))}
+                  {ungrouped.length > 0 && (
+                    <div>
+                      {Object.keys(grouped).length > 0 && (
+                        <div style={{ padding: '8px 16px', background: 'var(--color-surface-2)', borderBottom: '1px solid var(--color-border-subtle)', borderTop: '1px solid var(--color-border-subtle)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)' }}>Ungrouped</span>
+                          <span style={{ fontSize: 11, color: 'var(--color-text-faint)' }}>{ungrouped.length} monitor{ungrouped.length !== 1 ? 's' : ''}</span>
+                        </div>
+                      )}
+                      {ungrouped.map(m => (
+                        <MonitorCardMobile
+                          key={m.id} m={m}
+                          selected={selectedIds.has(m.id)}
+                          onToggleSelect={() => toggleSelect(m.id)}
+                          onEdit={m => setModal({ open: true, monitor: m })}
+                          onDelete={handleDelete}
+                          visibilityMutation={visibilityMutation}
+                          favoriteMutation={favoriteMutation}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ) : viewMode === 'flat' || !hasGroups ? (
+            /* Desktop flat table */
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <TableColGroup />
               <thead>
                 <tr>
-                  {/* select-all checkbox in header */}
                   <th style={{ padding: '8px 4px 8px 12px', borderBottom: '1px solid var(--color-border-muted)' }}>
-                    <CheckboxCell
-                      checked={allFilteredSelected}
-                      indeterminate={!allFilteredSelected && someFilteredSelected}
-                      onChange={toggleSelectAll}
-                    />
+                    <CheckboxCell checked={allFilteredSelected} indeterminate={!allFilteredSelected && someFilteredSelected} onChange={toggleSelectAll} />
                   </th>
                   {tableHeaders.slice(1).map(h => (
                     <th key={h} style={{ padding: '8px 20px', textAlign: 'left', fontSize: 11, color: 'var(--color-text-dim)', fontWeight: 500, borderBottom: '1px solid var(--color-border-muted)' }}>{h}</th>
@@ -1564,42 +1526,31 @@ export default function Monitors() {
                 )}
                 {filtered.map((m, idx) => (
                   <MonitorRow
-                    key={m.id}
-                    m={m}
-                    isLast={idx === filtered.length - 1}
-                    selected={selectedIds.has(m.id)}
-                    onToggleSelect={() => toggleSelect(m.id)}
-                    onEdit={m => setModal({ open: true, monitor: m })}
-                    onDelete={handleDelete}
-                    visibilityMutation={visibilityMutation}
-                    favoriteMutation={favoriteMutation}
+                    key={m.id} m={m} isLast={idx === filtered.length - 1}
+                    selected={selectedIds.has(m.id)} onToggleSelect={() => toggleSelect(m.id)}
+                    onEdit={m => setModal({ open: true, monitor: m })} onDelete={handleDelete}
+                    visibilityMutation={visibilityMutation} favoriteMutation={favoriteMutation}
                   />
                 ))}
               </tbody>
             </table>
           ) : (
-            /* grouped view */
+            /* Desktop grouped view */
             <div>
               {filtered.length === 0 && (
                 <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-dim)', fontSize: 13 }}>
                   {search || groupFilter || labelFilter ? 'No monitors match your filters' : 'No monitors yet. Add your first monitor.'}
                 </div>
               )}
-
               {Object.entries(grouped).map(([group, items]) => (
                 <GroupSection
-                  key={group}
-                  groupName={group}
-                  monitors={items}
-                  selectedIds={selectedIds}
-                  onToggleSelect={toggleSelect}
-                  onEdit={m => setModal({ open: true, monitor: m })}
-                  onDelete={handleDelete}
-                  visibilityMutation={visibilityMutation}
-                  favoriteMutation={favoriteMutation}
+                  key={group} groupName={group} monitors={items}
+                  selectedIds={selectedIds} onToggleSelect={toggleSelect}
+                  onEdit={m => setModal({ open: true, monitor: m })} onDelete={handleDelete}
+                  visibilityMutation={visibilityMutation} favoriteMutation={favoriteMutation}
+                  isMobile={false}
                 />
               ))}
-
               {ungrouped.length > 0 && (
                 <div>
                   {Object.keys(grouped).length > 0 && (
@@ -1618,12 +1569,7 @@ export default function Monitors() {
                             indeterminate={!ungrouped.every(m => selectedIds.has(m.id)) && ungrouped.some(m => selectedIds.has(m.id))}
                             onChange={() => {
                               const allSel = ungrouped.every(m => selectedIds.has(m.id))
-                              setSelectedIds(prev => {
-                                const next = new Set(prev)
-                                if (allSel) ungrouped.forEach(m => next.delete(m.id))
-                                else ungrouped.forEach(m => next.add(m.id))
-                                return next
-                              })
+                              setSelectedIds(prev => { const next = new Set(prev); if (allSel) ungrouped.forEach(m => next.delete(m.id)); else ungrouped.forEach(m => next.add(m.id)); return next })
                             }}
                           />
                         </th>
@@ -1635,15 +1581,10 @@ export default function Monitors() {
                     <tbody>
                       {ungrouped.map((m, idx) => (
                         <MonitorRow
-                          key={m.id}
-                          m={m}
-                          isLast={idx === ungrouped.length - 1}
-                          selected={selectedIds.has(m.id)}
-                          onToggleSelect={() => toggleSelect(m.id)}
-                          onEdit={m => setModal({ open: true, monitor: m })}
-                          onDelete={handleDelete}
-                          visibilityMutation={visibilityMutation}
-                          favoriteMutation={favoriteMutation}
+                          key={m.id} m={m} isLast={idx === ungrouped.length - 1}
+                          selected={selectedIds.has(m.id)} onToggleSelect={() => toggleSelect(m.id)}
+                          onEdit={m => setModal({ open: true, monitor: m })} onDelete={handleDelete}
+                          visibilityMutation={visibilityMutation} favoriteMutation={favoriteMutation}
                         />
                       ))}
                     </tbody>
@@ -1655,7 +1596,7 @@ export default function Monitors() {
         </Card>
       </div>
 
-      {/* ── Create / edit modal ── */}
+      {/* Modals */}
       {modal.open && (
         <MonitorModal
           initial={modal.monitor}
@@ -1665,8 +1606,6 @@ export default function Monitors() {
           groups={groups}
         />
       )}
-
-      {/* ── Bulk edit modal ── */}
       {bulkModal && (
         <BulkEditModal
           count={selectedCount}

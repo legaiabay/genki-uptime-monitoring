@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle, Clock, RefreshCw } from 'lucide-react'
 import Card from '@/components/ui/Card'
 import { useIncidents, useUpdateIncident } from '@/hooks/useIncidents'
 import { useMonitors } from '@/hooks/useMonitors'
+import { useBreakpoint } from '@/hooks/useBreakpoint'
 import type { IncidentStatus } from '@/types'
 
 function timeAgo(iso: string) {
@@ -31,6 +32,7 @@ export default function Incidents() {
   const { data: monitors = [] } = useMonitors()
   const updateMutation = useUpdateIncident()
   const [filter, setFilter] = useState<IncidentStatus | 'all'>('all')
+  const { isMobile } = useBreakpoint()
 
   const filtered = filter === 'all' ? incidents : incidents.filter(i => i.status === filter)
 
@@ -46,12 +48,18 @@ export default function Incidents() {
   }
 
   return (
-    <div style={{ padding: '20px 24px' }}>
-      {/* header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+    <div style={{ padding: isMobile ? '16px' : '20px 24px' }}>
+
+      {/* Header */}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+        marginBottom: 20,
+      }}>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 600, color: 'var(--color-text)', marginBottom: 2 }}>Incidents</h1>
-          <p style={{ fontSize: 12, color: 'var(--color-text-dim)' }}>{incidents.filter(i => i.status !== 'resolved').length} active incidents</p>
+          <p style={{ fontSize: 12, color: 'var(--color-text-dim)' }}>
+            {incidents.filter(i => i.status !== 'resolved').length} active incidents
+          </p>
         </div>
         <button
           onClick={() => refetch()}
@@ -61,28 +69,69 @@ export default function Incidents() {
         </button>
       </div>
 
-      {/* summary strip */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 20 }}>
-        {[
-          { label: 'Active', count: incidents.filter(i => i.status === 'investigating').length, color: '#f6ad55' },
-          { label: 'Identified', count: incidents.filter(i => i.status === 'identified').length, color: '#fc8181' },
-          { label: 'Resolved', count: incidents.filter(i => i.status === 'resolved').length, color: '#68d391' },
-        ].map(s => (
-          <Card key={s.label} style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 8, background: `${s.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <AlertTriangle size={16} color={s.color} />
-            </div>
-            <div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1 }}>{s.count}</div>
-              <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>{s.label}</div>
-            </div>
-          </Card>
-        ))}
-      </div>
+      {/* Summary strip */}
+      {isMobile ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+          {/* Row 1: Active + Identified */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {[
+              { label: 'Active',     count: incidents.filter(i => i.status === 'investigating').length, color: '#f6ad55' },
+              { label: 'Identified', count: incidents.filter(i => i.status === 'identified').length,    color: '#fc8181' },
+            ].map(s => (
+              <Card key={s.label} style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: `${s.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <AlertTriangle size={14} color={s.color} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1 }}>{s.count}</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>{s.label}</div>
+                </div>
+              </Card>
+            ))}
+          </div>
+          {/* Row 2: Resolved full width */}
+          {(() => {
+            const s = { label: 'Resolved', count: incidents.filter(i => i.status === 'resolved').length, color: '#68d391' }
+            return (
+              <Card key={s.label} style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: `${s.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <AlertTriangle size={14} color={s.color} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1 }}>{s.count}</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>{s.label}</div>
+                </div>
+              </Card>
+            )
+          })()}
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 20 }}>
+          {[
+            { label: 'Active',     count: incidents.filter(i => i.status === 'investigating').length, color: '#f6ad55' },
+            { label: 'Identified', count: incidents.filter(i => i.status === 'identified').length,    color: '#fc8181' },
+            { label: 'Resolved',   count: incidents.filter(i => i.status === 'resolved').length,      color: '#68d391' },
+          ].map(s => (
+            <Card key={s.label} style={{ padding: isMobile ? '12px 14px' : '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 8, background: `${s.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <AlertTriangle size={15} color={s.color} />
+              </div>
+              <div>
+                <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1 }}>{s.count}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>{s.label}</div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <Card>
-        {/* tabs */}
-        <div style={{ display: 'flex', gap: 4, padding: '12px 16px', borderBottom: '1px solid var(--color-border-muted)' }}>
+        {/* Tabs — horizontally scrollable on mobile */}
+        <div style={{
+          display: 'flex', gap: 4, padding: '12px 16px',
+          borderBottom: '1px solid var(--color-border-muted)',
+          overflowX: 'auto', WebkitOverflowScrolling: 'touch' as any,
+        }}>
           {tabs.map(tab => (
             <button
               key={tab.value}
@@ -93,6 +142,7 @@ export default function Incidents() {
                 background: filter === tab.value ? 'var(--color-surface-hover)' : 'transparent',
                 color: filter === tab.value ? (tabColors[tab.value] ?? 'var(--color-text)') : 'var(--color-text-muted)',
                 fontWeight: filter === tab.value ? 500 : 400,
+                whiteSpace: 'nowrap', flexShrink: 0,
               }}
             >
               {tab.label}
@@ -103,7 +153,7 @@ export default function Incidents() {
           ))}
         </div>
 
-        {/* list */}
+        {/* Incident list */}
         <div>
           {filtered.length === 0 && (
             <div style={{ padding: '48px', textAlign: 'center', color: 'var(--color-text-dim)', fontSize: 13 }}>
@@ -114,72 +164,93 @@ export default function Incidents() {
             const cfg = statusConfig[inc.status]
             const Icon = cfg.icon
             const monitor = monitors.find(m => m.id === inc.monitor_id)
-            return (
-              <div key={inc.id} style={{
-                padding: '16px',
-                borderBottom: idx < filtered.length - 1 ? '1px solid var(--color-row-divider)' : 'none',
-                display: 'flex', gap: 14,
-              }}>
-                {/* icon */}
-                <div style={{ width: 32, height: 32, borderRadius: 8, background: cfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
-                  <Icon size={15} color={cfg.color} />
-                </div>
 
-                {/* content */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 6 }}>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 3 }}>{inc.title}</div>
-                      {monitor && (
-                        <div style={{ fontSize: 11, color: 'var(--color-text-dim)' }}>
-                          Affects: <span style={{ color: 'var(--color-text-muted)' }}>{monitor.name}</span> — {monitor.url}
+            return (
+              <div
+                key={inc.id}
+                style={{
+                  padding: isMobile ? '14px' : '16px',
+                  borderBottom: idx < filtered.length - 1 ? '1px solid var(--color-row-divider)' : 'none',
+                }}
+              >
+                {/* Top row: icon + content */}
+                <div style={{ display: 'flex', gap: 12 }}>
+                  {/* Icon */}
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: cfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                    <Icon size={15} color={cfg.color} />
+                  </div>
+
+                  {/* Content */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {/* Title row + status badge */}
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: isMobile ? 'flex-start' : 'flex-start',
+                      gap: 10,
+                      marginBottom: 4,
+                      flexWrap: isMobile ? 'wrap' : 'nowrap',
+                    }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{
+                          fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 3,
+                          overflow: 'hidden',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                        }}>
+                          {inc.title}
                         </div>
-                      )}
-                    </div>
-                    {/* status badge + actions */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                      <span style={{ fontSize: 11, fontWeight: 500, color: cfg.color, background: cfg.bg, padding: '3px 8px', borderRadius: 4 }}>
+                        {monitor && (
+                          <div style={{ fontSize: 11, color: 'var(--color-text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: isMobile ? 'normal' : 'nowrap' }}>
+                            Affects: <span style={{ color: 'var(--color-text-muted)' }}>{monitor.name}</span>
+                            {!isMobile && ` — ${monitor.url}`}
+                          </div>
+                        )}
+                      </div>
+
+                      <span style={{ fontSize: 11, fontWeight: 500, color: cfg.color, background: cfg.bg, padding: '3px 8px', borderRadius: 4, whiteSpace: 'nowrap', flexShrink: 0 }}>
                         {cfg.label}
                       </span>
                     </div>
-                  </div>
 
-                  {/* meta */}
-                  <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--color-text-dim)' }}>
-                      <Clock size={11} />
-                      Started {timeAgo(inc.started_at)}
+                    {/* Meta row */}
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--color-text-dim)' }}>
+                        <Clock size={11} />
+                        Started {timeAgo(inc.started_at)}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-dim)' }}>
+                        Duration: {duration(inc.started_at, inc.resolved_at)}
+                      </div>
+                      {inc.resolved_at && (
+                        <div style={{ fontSize: 11, color: '#68d391' }}>
+                          Resolved {timeAgo(inc.resolved_at)}
+                        </div>
+                      )}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--color-text-dim)' }}>
-                      Duration: {duration(inc.started_at, inc.resolved_at)}
-                    </div>
-                    {inc.resolved_at && (
-                      <div style={{ fontSize: 11, color: '#68d391' }}>
-                        Resolved {timeAgo(inc.resolved_at)}
+
+                    {/* Quick actions — inline on desktop, below meta on mobile */}
+                    {inc.status !== 'resolved' && (
+                      <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                        {inc.status === 'investigating' && (
+                          <button
+                            onClick={() => updateMutation.mutate({ id: inc.id, status: 'identified' })}
+                            style={{ background: 'none', border: '1px solid var(--color-border)', borderRadius: 5, color: '#fc8181', fontSize: 11, padding: '5px 12px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          >
+                            Mark Identified
+                          </button>
+                        )}
+                        <button
+                          onClick={() => updateMutation.mutate({ id: inc.id, status: 'resolved' })}
+                          style={{ background: 'none', border: '1px solid var(--color-border)', borderRadius: 5, color: '#68d391', fontSize: 11, padding: '5px 12px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                        >
+                          Mark Resolved
+                        </button>
                       </div>
                     )}
                   </div>
                 </div>
-
-                {/* quick actions */}
-                {inc.status !== 'resolved' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-                    {inc.status === 'investigating' && (
-                      <button
-                        onClick={() => updateMutation.mutate({ id: inc.id, status: 'identified' })}
-                        style={{ background: 'none', border: '1px solid var(--color-border)', borderRadius: 5, color: '#fc8181', fontSize: 11, padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                      >
-                        Mark Identified
-                      </button>
-                    )}
-                    <button
-                      onClick={() => updateMutation.mutate({ id: inc.id, status: 'resolved' })}
-                      style={{ background: 'none', border: '1px solid var(--color-border)', borderRadius: 5, color: '#68d391', fontSize: 11, padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                    >
-                      Mark Resolved
-                    </button>
-                  </div>
-                )}
               </div>
             )
           })}

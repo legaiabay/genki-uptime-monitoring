@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/api/middleware"
+	"github.com/legaiabay/genki-uptime-monitoring/internal/api/middleware"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"

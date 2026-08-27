@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/api/middleware"
-	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/config"
+	"github.com/legaiabay/genki-uptime-monitoring/internal/api/middleware"
+	"github.com/legaiabay/genki-uptime-monitoring/internal/config"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"

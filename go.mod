@@ -1,4 +1,4 @@
-module github.com/abdulkhobirfauzi/genki-uptime-monitoring
+module github.com/legaiabay/genki-uptime-monitoring
 
 go 1.23
 

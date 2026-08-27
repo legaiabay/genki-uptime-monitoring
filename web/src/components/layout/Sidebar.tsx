@@ -9,12 +9,15 @@ import {
   LogOut,
   Sun,
   Moon,
+  ArrowUpCircle,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import logo from '@/assets/logo.png'
 import logoDark from '@/assets/logo-dark.png'
 import { useProfile } from '@/hooks/useProfile'
 import { useOverviewStats } from '@/hooks/useOverviewStats'
+import { useVersion } from '@/hooks/useVersion'
+import { useIncidents } from '@/hooks/useIncidents'
 import UserAvatar from '@/components/ui/UserAvatar'
 import { useThemeStore } from '@/store/themeStore'
 
@@ -27,14 +30,37 @@ const navItems = [
 ]
 
 export default function Sidebar() {
+  const isMobileViewport = () => window.innerWidth < 768
+
   const [collapsed, setCollapsed] = useState(() => {
+    // On mobile, always start collapsed regardless of saved preference
+    if (isMobileViewport()) return true
     return localStorage.getItem('sidebar-collapsed') === 'true'
   })
+
+  // Auto-collapse when viewport shrinks into mobile range
+  useEffect(() => {
+    function handleResize() {
+      if (isMobileViewport()) {
+        setCollapsed(true)
+      }
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
   const navigate = useNavigate()
 
   const { data: profile } = useProfile()
   const { data: stats } = useOverviewStats()
+  const { data: version } = useVersion()
+  const { data: incidents } = useIncidents()
   const { theme, toggleTheme } = useThemeStore()
+
+  const unresolvedCount = incidents
+    ? incidents.filter(i => i.status !== 'resolved').length
+    : 0
+
+  const [updateDismissed, setUpdateDismissed] = useState(false)
 
   const displayName = profile?.name ?? '…'
   const displayEmail = profile?.email ?? ''
@@ -76,7 +102,9 @@ export default function Sidebar() {
         <button
           onClick={() => setCollapsed(o => {
             const next = !o
-            localStorage.setItem('sidebar-collapsed', String(next))
+            if (!isMobileViewport()) {
+              localStorage.setItem('sidebar-collapsed', String(next))
+            }
             return next
           })}
           style={{
@@ -114,11 +142,115 @@ export default function Sidebar() {
               transition: 'background 0.1s, color 0.1s',
             })}
           >
-            <Icon size={15} strokeWidth={1.8} style={{ flexShrink: 0 }} />
-            {!collapsed && <span>{label}</span>}
+            <div style={{ position: 'relative', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+              <Icon size={15} strokeWidth={1.8} />
+              {to === '/incidents' && unresolvedCount > 0 && collapsed && (
+                <span style={{
+                  position: 'absolute',
+                  top: -5,
+                  right: -5,
+                  minWidth: 14,
+                  height: 14,
+                  borderRadius: 7,
+                  background: 'var(--color-down)',
+                  color: '#fff',
+                  fontSize: 9,
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 3px',
+                  lineHeight: 1,
+                }}>
+                  {unresolvedCount > 99 ? '99+' : unresolvedCount}
+                </span>
+              )}
+            </div>
+            {!collapsed && <span style={{ flex: 1 }}>{label}</span>}
+            {!collapsed && to === '/incidents' && unresolvedCount > 0 && (
+              <span style={{
+                minWidth: 18,
+                height: 18,
+                borderRadius: 9,
+                background: 'var(--color-down)',
+                color: '#fff',
+                fontSize: 10,
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '0 5px',
+                lineHeight: 1,
+                flexShrink: 0,
+              }}>
+                {unresolvedCount > 99 ? '99+' : unresolvedCount}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>
+
+      {/* Update available banner */}
+      {version?.update_available && !updateDismissed && (
+        <div style={{
+          margin: '0 6px 6px',
+          padding: collapsed ? '8px 6px' : '8px 10px',
+          background: 'var(--color-surface-2)',
+          border: '1px solid var(--color-degraded)',
+          borderRadius: 6,
+          flexShrink: 0,
+        }}>
+          {collapsed ? (
+            <a
+              href={version.release_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`Update available: ${version.latest}`}
+              style={{ display: 'flex', justifyContent: 'center', color: 'var(--color-degraded)' }}
+            >
+              <ArrowUpCircle size={15} strokeWidth={1.8} />
+            </a>
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: 'var(--color-degraded)' }}>
+                  <ArrowUpCircle size={13} strokeWidth={2} />
+                  <span style={{ fontSize: 11, fontWeight: 600 }}>Update available</span>
+                </div>
+                <button
+                  onClick={() => setUpdateDismissed(true)}
+                  title="Dismiss"
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--color-text-dim)', padding: '0 2px', fontSize: 13, lineHeight: 1,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 6 }}>
+                {version.latest} is out (you have {version.current})
+              </div>
+              <a
+                href={version.release_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-block',
+                  fontSize: 11,
+                  color: 'var(--color-degraded)',
+                  textDecoration: 'none',
+                  fontWeight: 500,
+                }}
+                onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+                onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
+              >
+                View release →
+              </a>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Footer */}
       <div style={{ borderTop: '1px solid var(--color-border)', padding: collapsed ? '10px 6px' : '12px 14px', flexShrink: 0 }}>

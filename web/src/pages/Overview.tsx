@@ -19,7 +19,8 @@ import { useMonitors } from '@/hooks/useMonitors'
 import { useIncidents } from '@/hooks/useIncidents'
 import { useUptimeSeries } from '@/hooks/useUptimeSeries'
 import { useAppSettings, useUpdateAppSettings } from '@/hooks/useProfile'
-import type { MonitorStatus } from '@/types'
+import { useBreakpoint } from '@/hooks/useBreakpoint'
+import type { Monitor, MonitorStatus } from '@/types'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -73,33 +74,147 @@ const TIME_RANGES = [
 
 // ── stat card ─────────────────────────────────────────────────────────────────
 
-function StatCard({ label, value, sub, subColor, icon, barData }: {
+function StatCard({ label, value, sub, subColor, icon, barData, compact }: {
   label: string; value: string; sub?: string; subColor?: string
-  icon: React.ReactNode; barData?: Array<'up' | 'down' | 'degraded'>
+  icon?: React.ReactNode; barData?: Array<'up' | 'down' | 'degraded'>
+  compact?: boolean
 }) {
   return (
-    <Card style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <Card style={{ padding: compact ? '12px 14px' : '18px 20px', display: 'flex', flexDirection: 'column', gap: compact ? 6 : 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 6 }}>{label}</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1 }}>{value}</div>
-          {sub && <div style={{ fontSize: 11, color: subColor ?? '#666', marginTop: 6 }}>{sub}</div>}
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{
+            fontSize: compact ? 10 : 12,
+            color: 'var(--color-text-muted)',
+            marginBottom: compact ? 3 : 6,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>{label}</div>
+          <div style={{ fontSize: compact ? 17 : 28, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1 }}>{value}</div>
+          {sub && <div style={{ fontSize: compact ? 10 : 11, color: subColor ?? '#666', marginTop: compact ? 3 : 6 }}>{sub}</div>}
         </div>
-        <div style={{ width: 34, height: 34, borderRadius: 8, background: 'var(--color-surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-dim)', flexShrink: 0 }}>
-          {icon}
-        </div>
+        {icon && (
+          <div style={{ width: 34, height: 34, borderRadius: 8, background: 'var(--color-surface-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-dim)', flexShrink: 0 }}>
+            {icon}
+          </div>
+        )}
       </div>
-      {barData && <UptimeBars data={barData} width={160} height={24} />}
+      {barData && <UptimeBars data={barData} width={160} height={compact ? 18 : 24} />}
     </Card>
   )
 }
 
-// ── chart tooltip ─────────────────────────────────────────────────────────────
+// ── monitor card (mobile) ─────────────────────────────────────────────────────
+
+function MonitorCard({ m, onDelete, onToggleFavorite }: {
+  m: Monitor
+  onDelete: (id: number) => void
+  onToggleFavorite: (id: number, fav: boolean) => void
+}) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const navigate = useNavigate()
+
+  return (
+    <div style={{
+      padding: '12px 16px',
+      borderBottom: '1px solid var(--color-row-divider)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <StatusBadge status={m.status} />
+            <span style={{ fontSize: 13, color: 'var(--color-text)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {m.name}
+            </span>
+            {m.favorite && <Star size={11} fill="#f6ad55" color="#f6ad55" />}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--color-text-dim)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {m.url}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+              {m.uptime_percentage === 100 ? '100%' : `${m.uptime_percentage.toFixed(2)}%`} uptime
+            </span>
+            {m.last_response_time != null && (
+              <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                {m.last_response_time}ms
+              </span>
+            )}
+            {m.last_checked_at && (
+              <span style={{ fontSize: 11, color: 'var(--color-text-dim)' }}>
+                {timeAgo(m.last_checked_at)}
+              </span>
+            )}
+          </div>
+          {(m.group_name || m.labels.length > 0) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
+              {m.group_name && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--color-text-muted)', background: 'var(--color-surface-2)', padding: '1px 6px', borderRadius: 8, border: '1px solid var(--color-border)' }}>
+                  <Layers size={9} color="#555" />{m.group_name}
+                </span>
+              )}
+              {m.labels.map(l => <LabelChip key={l} label={l} />)}
+            </div>
+          )}
+        </div>
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <button
+            onClick={() => setMenuOpen(o => !o)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-faint)', padding: 4, display: 'flex', alignItems: 'center', borderRadius: 4 }}
+          >
+            <MoreVertical size={14} />
+          </button>
+          {menuOpen && (
+            <>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setMenuOpen(false)} />
+              <div style={{
+                position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 50,
+                background: 'var(--color-surface-2)', border: '1px solid var(--color-border)',
+                borderRadius: 6, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', minWidth: 160, overflow: 'hidden',
+              }}>
+                <button
+                  onClick={() => { setMenuOpen(false); navigate('/monitors') }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer' }}
+                >
+                  <Edit2 size={13} /> Edit
+                </button>
+                <button
+                  onClick={() => { setMenuOpen(false); navigate('/monitors') }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer' }}
+                >
+                  <FileText size={13} /> View Logs
+                </button>
+                <button
+                  onClick={() => { onToggleFavorite(m.id, !m.favorite); setMenuOpen(false) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer' }}
+                >
+                  <Star size={13} fill={m.favorite ? '#f6ad55' : 'none'} color={m.favorite ? '#f6ad55' : 'currentColor'} />
+                  {m.favorite ? 'Unfavorite' : 'Favorite'}
+                </button>
+                <div style={{ height: 1, background: 'var(--color-border)', margin: '2px 0' }} />
+                <button
+                  onClick={() => {
+                    if (confirm(`Delete monitor "${m.name}"?`)) onDelete(m.id)
+                    setMenuOpen(false)
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', color: '#fc8181', fontSize: 12, cursor: 'pointer' }}
+                >
+                  <Trash2 size={13} /> Delete
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ── main ──────────────────────────────────────────────────────────────────────
 
 export default function Overview() {
   const navigate = useNavigate()
+  const { isMobile } = useBreakpoint()
+
   const [timeRange, setTimeRange] = useState('24h')
   const [showTimeDropdown, setShowTimeDropdown] = useState(false)
   const [showIntervalDropdown, setShowIntervalDropdown] = useState(false)
@@ -122,16 +237,8 @@ export default function Overview() {
   const isFetching = statsFetching || monitorsFetching
 
   const hasFavorites = monitors.some(m => m.favorite)
-  // Default to 'favorites' if any favorites exist; 'all' otherwise.
-  // Use lazy initializer so it only fires once on mount, not re-derived on every render.
-  const [chartFilter, setChartFilter] = useState<'all' | 'favorites'>(() =>
-    // We don't have monitors on first render, so default to 'favorites' and let
-    // a useEffect below correct to 'all' only when we're certain there are none.
-    'favorites'
-  )
+  const [chartFilter, setChartFilter] = useState<'all' | 'favorites'>(() => 'favorites')
 
-  // Once monitors load: if none are favorited, switch to 'all'.
-  // Never switch back automatically — let the user control it after that.
   const [correctedDefault, setCorrectedDefault] = useState(false)
   useEffect(() => {
     if (!correctedDefault && monitors.length > 0) {
@@ -153,10 +260,8 @@ export default function Overview() {
     Array(5).fill(m.status === 'pending' ? 'up' : m.status)
   ) as Array<'up' | 'down' | 'degraded'>
 
-  // Collect unique groups for quick filter
   const allGroups = Array.from(new Set(monitors.map(m => m.group_name).filter(Boolean))).sort()
 
-  // Filter monitors for the status table
   const filteredMonitors = monitors.filter(m => {
     const q = search.toLowerCase()
     const matchSearch = !q || (
@@ -169,10 +274,8 @@ export default function Overview() {
     return matchSearch && matchGroup
   })
 
-  // Build uptime chart from time-series API
   const activeMonitors = monitors.filter(m => m.active)
 
-  // Build recharts-compatible data: [{time, "Monitor A": 100, "Monitor B": 95, ...}, ...]
   const chartData = (series?.labels ?? []).map((label, i) => {
     const point: Record<string, string | number> = { time: label }
     for (const mon of series?.monitors ?? []) {
@@ -181,7 +284,6 @@ export default function Overview() {
     return point
   })
 
-  // Response-time chart data — use null for zero-value buckets so Recharts skips them
   const rtChartData = (series?.labels ?? []).map((label, i) => {
     const point: Record<string, string | number | null> = { time: label }
     for (const mon of series?.monitors ?? []) {
@@ -192,7 +294,6 @@ export default function Overview() {
   })
 
   const activeChartData = chartView === 'uptime' ? chartData : rtChartData
-
   const hasSeriesData = chartData.length > 1
 
   function handleRefresh() {
@@ -200,8 +301,19 @@ export default function Overview() {
     refetchMonitors()
   }
 
+  // ── Interval picker ───────────────────────────────────────────────────────
+
+  const INTERVAL_OPTIONS = [
+    { label: '30 seconds', value: '30' },
+    { label: '1 minute',   value: '60' },
+    { label: '2 minutes',  value: '120' },
+    { label: '5 minutes',  value: '300' },
+    { label: '10 minutes', value: '600' },
+    { label: '30 minutes', value: '1800' },
+  ]
+
   return (
-    <div style={{ padding: '20px 24px', minHeight: '100%', position: 'relative' }}>
+    <div style={{ padding: isMobile ? '16px' : '20px 24px', minHeight: '100%', position: 'relative' }}>
 
       {/* Loading bar */}
       {isFetching && (
@@ -213,31 +325,27 @@ export default function Overview() {
         }} />
       )}
 
-      {/* header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+      {/* ── Header ── */}
+      <div className="overview-header">
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 600, color: 'var(--color-text)', marginBottom: 2 }}>Overview</h1>
           <p style={{ fontSize: 12, color: 'var(--color-text-dim)' }}>System health at a glance</p>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div className="overview-header-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* Interval picker */}
           {appSettings?.default_interval && (() => {
             const secs = parseInt(appSettings.default_interval, 10)
             const intervalLabel = secs >= 60 ? `${secs / 60}m` : `${secs}s`
-            const INTERVAL_OPTIONS = [
-              { label: '30 seconds', value: '30' },
-              { label: '1 minute',   value: '60' },
-              { label: '2 minutes',  value: '120' },
-              { label: '5 minutes',  value: '300' },
-              { label: '10 minutes', value: '600' },
-              { label: '30 minutes', value: '1800' },
-            ]
             return (
               <div style={{ position: 'relative' }}>
                 <button
                   onClick={() => setShowIntervalDropdown(o => !o)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 12, padding: '6px 12px', cursor: 'pointer' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 12, padding: '6px 10px', cursor: 'pointer' }}
                 >
-                  <Clock size={13} />Check interval: <span style={{ color: 'var(--color-text)', fontWeight: 500 }}>{intervalLabel}</span><ChevronDown size={12} />
+                  <Clock size={13} />
+                  {!isMobile && <span>Check interval: </span>}
+                  <span style={{ color: 'var(--color-text)', fontWeight: 500 }}>{intervalLabel}</span>
+                  <ChevronDown size={12} />
                 </button>
                 {showIntervalDropdown && (
                   <>
@@ -258,12 +366,16 @@ export default function Overview() {
               </div>
             )
           })()}
+
+          {/* Time range picker */}
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setShowTimeDropdown(o => !o)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 12, padding: '6px 12px', cursor: 'pointer' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 12, padding: '6px 10px', cursor: 'pointer' }}
             >
-              <Clock size={13} />{selectedRange.label}<ChevronDown size={12} />
+              <Clock size={13} />
+              <span style={{ color: 'var(--color-text)' }}>{isMobile ? timeRange : selectedRange.label}</span>
+              <ChevronDown size={12} />
             </button>
             {showTimeDropdown && (
               <>
@@ -279,90 +391,81 @@ export default function Overview() {
               </>
             )}
           </div>
-          <button onClick={handleRefresh} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 12, padding: '6px 10px', cursor: 'pointer', lineHeight: 1 }}>
+
+          {/* Refresh */}
+          <button
+            onClick={handleRefresh}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 12, padding: '6px 10px', cursor: 'pointer', lineHeight: 1 }}
+          >
             <RefreshCw size={13} style={{ animation: isFetching ? 'spin 1s linear infinite' : 'none' }} />
           </button>
-          <button onClick={() => navigate('/monitors')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#e53e3e', border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 500, padding: '6px 14px', cursor: 'pointer' }}>
-            <Plus size={13} />Add Monitor
+
+          {/* Add monitor */}
+          <button
+            onClick={() => navigate('/monitors')}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#e53e3e', border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 500, padding: '6px 14px', cursor: 'pointer' }}
+          >
+            <Plus size={13} />
+            {!isMobile && 'Add Monitor'}
           </button>
         </div>
       </div>
 
-      {/* ── Uptime chart — full width, all active monitors ── */}
-      <Card style={{ padding: '16px 20px', marginBottom: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
-                {chartView === 'uptime' ? 'Uptime' : 'Response Time'} — All Monitors
-              </span>
-              <span style={{ fontSize: 12, color: 'var(--color-text-dim)', marginLeft: 10 }}>{selectedRange.label}</span>
-            </div>
-
-            {/* Uptime / Response Time view toggle */}
-            <div style={{ display: 'flex', gap: 2, background: 'var(--color-input-bg)', borderRadius: 6, padding: 2, border: '1px solid var(--color-border)' }}>
-              <button
-                onClick={() => setChartView('uptime')}
-                style={{
-                  padding: '3px 10px', borderRadius: 4, fontSize: 11, cursor: 'pointer', border: 'none',
-                  background: chartView === 'uptime' ? 'var(--color-surface-hover)' : 'transparent',
-                  color: chartView === 'uptime' ? 'var(--color-text)' : 'var(--color-text-dim)',
-                  fontWeight: chartView === 'uptime' ? 500 : 400,
-                }}
-              >
-                Uptime %
-              </button>
-              <button
-                onClick={() => setChartView('response_time')}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  padding: '3px 10px', borderRadius: 4, fontSize: 11, cursor: 'pointer', border: 'none',
-                  background: chartView === 'response_time' ? 'var(--color-surface-hover)' : 'transparent',
-                  color: chartView === 'response_time' ? '#4299e1' : 'var(--color-text-dim)',
-                  fontWeight: chartView === 'response_time' ? 500 : 400,
-                }}
-              >
-                <Activity size={10} color={chartView === 'response_time' ? '#4299e1' : '#555'} />
-                Response Time
-              </button>
-            </div>
-
-            {/* All / Favorites toggle — only shown if any monitor is favorited */}
-            {hasFavorites && (
-              <div style={{ display: 'flex', gap: 2, background: 'var(--color-input-bg)', borderRadius: 6, padding: 2, border: '1px solid var(--color-border)' }}>
-                <button
-                  onClick={() => setChartFilter('all')}
-                  style={{
-                    padding: '3px 10px', borderRadius: 4, fontSize: 11, cursor: 'pointer', border: 'none',
-                    background: chartFilter === 'all' ? 'var(--color-surface-hover)' : 'transparent',
-                    color: chartFilter === 'all' ? 'var(--color-text)' : 'var(--color-text-dim)',
-                    fontWeight: chartFilter === 'all' ? 500 : 400,
-                  }}
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => setChartFilter('favorites')}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 4,
-                    padding: '3px 10px', borderRadius: 4, fontSize: 11, cursor: 'pointer', border: 'none',
-                    background: chartFilter === 'favorites' ? 'var(--color-surface-hover)' : 'transparent',
-                    color: chartFilter === 'favorites' ? '#f6ad55' : 'var(--color-text-dim)',
-                    fontWeight: chartFilter === 'favorites' ? 500 : 400,
-                  }}
-                >
-                  <Star size={10} fill={chartFilter === 'favorites' ? '#f6ad55' : 'none'} color={chartFilter === 'favorites' ? '#f6ad55' : '#555'} />
-                  Favorites
-                </button>
-              </div>
+      {/* ── Uptime chart ── */}
+      <Card style={{ padding: isMobile ? '14px 16px' : '16px 20px', marginBottom: 20, overflow: 'hidden' }}>
+        {/* Title row: always a single row */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isMobile ? 10 : 12 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
+            {chartView === 'uptime' ? 'Uptime' : 'Response Time'} — All Monitors
+            {!isMobile && (
+              <span style={{ fontSize: 12, color: 'var(--color-text-dim)', marginLeft: 10, fontWeight: 400 }}>{selectedRange.label}</span>
             )}
-          </div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)' }}>
+          </span>
+          <div style={{ fontSize: isMobile ? 18 : 22, fontWeight: 700, color: 'var(--color-text)' }}>
             {chartView === 'uptime'
               ? (stats ? `${stats.uptime_percentage.toFixed(2)}%` : '—')
               : (stats ? `${stats.avg_response_time}ms` : '—')
             }
           </div>
+        </div>
+
+        {/* Controls row: on mobile sits below the title */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+          {/* Uptime / Response Time toggle */}
+          <div style={{ display: 'flex', gap: 2, background: 'var(--color-input-bg)', borderRadius: 6, padding: 2, border: '1px solid var(--color-border)' }}>
+            <button
+              onClick={() => setChartView('uptime')}
+              style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, cursor: 'pointer', border: 'none', background: chartView === 'uptime' ? 'var(--color-surface-hover)' : 'transparent', color: chartView === 'uptime' ? 'var(--color-text)' : 'var(--color-text-dim)', fontWeight: chartView === 'uptime' ? 500 : 400 }}
+            >
+              {isMobile ? '%' : 'Uptime %'}
+            </button>
+            <button
+              onClick={() => setChartView('response_time')}
+              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 4, fontSize: 11, cursor: 'pointer', border: 'none', background: chartView === 'response_time' ? 'var(--color-surface-hover)' : 'transparent', color: chartView === 'response_time' ? '#4299e1' : 'var(--color-text-dim)', fontWeight: chartView === 'response_time' ? 500 : 400 }}
+            >
+              <Activity size={10} color={chartView === 'response_time' ? '#4299e1' : '#555'} />
+              {isMobile ? 'ms' : 'Response Time'}
+            </button>
+          </div>
+
+          {/* All / Favorites toggle */}
+          {hasFavorites && (
+            <div style={{ display: 'flex', gap: 2, background: 'var(--color-input-bg)', borderRadius: 6, padding: 2, border: '1px solid var(--color-border)' }}>
+              <button
+                onClick={() => setChartFilter('all')}
+                style={{ padding: '3px 8px', borderRadius: 4, fontSize: 11, cursor: 'pointer', border: 'none', background: chartFilter === 'all' ? 'var(--color-surface-hover)' : 'transparent', color: chartFilter === 'all' ? 'var(--color-text)' : 'var(--color-text-dim)', fontWeight: chartFilter === 'all' ? 500 : 400 }}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setChartFilter('favorites')}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 4, fontSize: 11, cursor: 'pointer', border: 'none', background: chartFilter === 'favorites' ? 'var(--color-surface-hover)' : 'transparent', color: chartFilter === 'favorites' ? '#f6ad55' : 'var(--color-text-dim)', fontWeight: chartFilter === 'favorites' ? 500 : 400 }}
+              >
+                <Star size={10} fill={chartFilter === 'favorites' ? '#f6ad55' : 'none'} color={chartFilter === 'favorites' ? '#f6ad55' : '#555'} />
+                Favorites
+              </button>
+            </div>
+          )}
         </div>
 
         {activeMonitors.length === 0 ? (
@@ -374,8 +477,8 @@ export default function Overview() {
             Not enough data yet — waiting for checks to complete
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height={140}>
-            <LineChart data={activeChartData} margin={{ top: 4, right: 8, left: 4, bottom: 0 }}>
+          <ResponsiveContainer width="100%" height={isMobile ? 110 : 140}>
+            <LineChart data={activeChartData} margin={{ top: 4, right: 8, left: isMobile ? 4 : 4, bottom: 0 }}>
               <CartesianGrid stroke="var(--color-border)" vertical={false} />
               <XAxis
                 dataKey="time"
@@ -391,9 +494,9 @@ export default function Overview() {
                   axisLine={false}
                   domain={[() => 0, () => 100]}
                   allowDataOverflow={false}
-                  width={42}
+                  width={isMobile ? 38 : 42}
                   tickFormatter={v => `${v}%`}
-                  ticks={[0, 25, 50, 75, 100]}
+                  ticks={isMobile ? [0, 50, 100] : [0, 25, 50, 75, 100]}
                 />
               ) : (
                 <YAxis
@@ -401,7 +504,7 @@ export default function Overview() {
                   tickLine={false}
                   axisLine={false}
                   domain={['auto', 'auto']}
-                  width={52}
+                  width={isMobile ? 44 : 52}
                   tickFormatter={v => `${v}ms`}
                 />
               )}
@@ -421,14 +524,14 @@ export default function Overview() {
                             : (b.value ?? 0) - (a.value ?? 0)
                         )
                         .map((p: any) => (
-                        <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.stroke, flexShrink: 0 }} />
-                          <span style={{ color: 'var(--color-text-muted)' }}>{p.name}:</span>
-                          <span style={{ color: 'var(--color-text)', fontWeight: 600 }}>
-                            {chartView === 'uptime' ? `${p.value}%` : `${p.value}ms`}
-                          </span>
-                        </div>
-                      ))}
+                          <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.stroke, flexShrink: 0 }} />
+                            <span style={{ color: 'var(--color-text-muted)' }}>{p.name}:</span>
+                            <span style={{ color: 'var(--color-text)', fontWeight: 600 }}>
+                              {chartView === 'uptime' ? `${p.value}%` : `${p.value}ms`}
+                            </span>
+                          </div>
+                        ))}
                     </div>
                   )
                 }}
@@ -472,48 +575,84 @@ export default function Overview() {
         )}
       </Card>
 
-      {/* stat cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
-        <Card style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-          <DonutChart up={upCount} degraded={degradedCount} down={downCount} total={totalCount} size={72} strokeWidth={7} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {[
-              { label: 'Up',       count: upCount,       color: '#48bb78' },
-              { label: 'Degraded', count: degradedCount, color: '#ed8936' },
-              { label: 'Down',     count: downCount,     color: '#e53e3e' },
-            ].map(item => (
-              <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
-                <span style={{ fontSize: 11, color: 'var(--color-text-muted)', width: 50 }}>{item.label}</span>
-                <span style={{ fontSize: 12, color: 'var(--color-text)', fontWeight: 600 }}>{item.count}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-        <StatCard label="Uptime (24h)" value={stats ? `${stats.uptime_percentage.toFixed(2)}%` : '—'} icon={<Heart size={16} />} barData={allBars.slice(0, 30)} />
-        <StatCard label="Avg. Response Time" value={stats ? `${stats.avg_response_time}ms` : '—'} icon={<Clock size={16} />} barData={allBars.slice(0, 30)} />
-        <StatCard
-          label="Incidents"
-          value={String(stats?.incident_count ?? incidents.length)}
-          sub={`${incidents.filter(i => i.status !== 'resolved').length} active`}
-          subColor="#ed8936"
-          icon={<AlertTriangle size={16} />}
-        />
-      </div>
+      {/* ── Stat cards ── */}
+      {isMobile ? (
+        /* Mobile: 2x2 grid — all 4 cards in one grid so columns align */
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+          {/* Cell 1: donut */}
+          <Card style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <DonutChart up={upCount} degraded={degradedCount} down={downCount} total={totalCount} size={60} strokeWidth={6} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
+              {[
+                { label: 'Up',       count: upCount,       color: '#48bb78' },
+                { label: 'Degraded', count: degradedCount, color: '#ed8936' },
+                { label: 'Down',     count: downCount,     color: '#e53e3e' },
+              ].map(item => (
+                <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
+                  <span style={{ fontSize: 10, color: 'var(--color-text-muted)', minWidth: 52 }}>{item.label}</span>
+                  <span style={{ fontSize: 11, color: 'var(--color-text)', fontWeight: 600 }}>{item.count}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+          {/* Cell 2: incidents */}
+          <StatCard
+            label="Incidents"
+            value={String(stats?.incident_count ?? incidents.length)}
+            sub={`${incidents.filter(i => i.status !== 'resolved').length} active`}
+            subColor="#ed8936"
+            compact
+          />
+          {/* Cell 3: uptime */}
+          <StatCard label="Uptime (24h)" value={stats ? `${stats.uptime_percentage.toFixed(2)}%` : '—'} barData={allBars.slice(0, 30)} compact />
+          {/* Cell 4: response time */}
+          <StatCard label="Avg. Response Time" value={stats ? `${stats.avg_response_time}ms` : '—'} barData={allBars.slice(0, 30)} compact />
+        </div>
+      ) : (
+        /* Desktop: 4 cols */
+        <div className="stat-grid" style={{ marginBottom: 20 }}>
+          <Card style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
+            <DonutChart up={upCount} degraded={degradedCount} down={downCount} total={totalCount} size={72} strokeWidth={7} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {[
+                { label: 'Up',       count: upCount,       color: '#48bb78' },
+                { label: 'Degraded', count: degradedCount, color: '#ed8936' },
+                { label: 'Down',     count: downCount,     color: '#e53e3e' },
+              ].map(item => (
+                <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: item.color, flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, color: 'var(--color-text-muted)', width: 50 }}>{item.label}</span>
+                  <span style={{ fontSize: 12, color: 'var(--color-text)', fontWeight: 600 }}>{item.count}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <StatCard label="Uptime (24h)" value={stats ? `${stats.uptime_percentage.toFixed(2)}%` : '—'} icon={<Heart size={16} />} barData={allBars.slice(0, 30)} />
+          <StatCard label="Avg. Response Time" value={stats ? `${stats.avg_response_time}ms` : '—'} icon={<Clock size={16} />} barData={allBars.slice(0, 30)} />
+          <StatCard
+            label="Incidents"
+            value={String(stats?.incident_count ?? incidents.length)}
+            sub={`${incidents.filter(i => i.status !== 'resolved').length} active`}
+            subColor="#ed8936"
+            icon={<AlertTriangle size={16} />}
+          />
+        </div>
+      )}
 
-      {/* main content — monitors + incidents side by side */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16, alignItems: 'start' }}>
+      {/* ── Main content: monitors + incidents ── */}
+      <div className="overview-main-grid">
 
-        {/* Monitors table */}
+        {/* ── Monitors ── */}
         <Card>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px 10px' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Monitors Status</span>
             <button onClick={() => navigate('/monitors')} style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer' }}>View all</button>
           </div>
 
-          {/* search + group filter */}
+          {/* Search + group filter */}
           <div style={{ display: 'flex', gap: 8, padding: '0 16px 10px', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: 180 }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: 160 }}>
               <Search size={12} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-dim)' }} />
               <input
                 value={search}
@@ -535,13 +674,7 @@ export default function Overview() {
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 <button
                   onClick={() => setGroupFilter(null)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 4,
-                    padding: '4px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer',
-                    border: groupFilter === null ? '1px solid var(--color-border-active)' : '1px solid transparent',
-                    background: groupFilter === null ? 'var(--color-surface-hover)' : 'transparent',
-                    color: groupFilter === null ? 'var(--color-text)' : 'var(--color-text-muted)',
-                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer', border: groupFilter === null ? '1px solid var(--color-border-active)' : '1px solid transparent', background: groupFilter === null ? 'var(--color-surface-hover)' : 'transparent', color: groupFilter === null ? 'var(--color-text)' : 'var(--color-text-muted)' }}
                 >
                   All
                 </button>
@@ -549,13 +682,7 @@ export default function Overview() {
                   <button
                     key={g}
                     onClick={() => setGroupFilter(gf => gf === g ? null : g)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 4,
-                      padding: '4px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer',
-                      border: groupFilter === g ? '1px solid var(--color-border-active)' : '1px solid transparent',
-                      background: groupFilter === g ? 'var(--color-surface-hover)' : 'transparent',
-                      color: groupFilter === g ? 'var(--color-text)' : 'var(--color-text-muted)',
-                    }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 5, fontSize: 11, cursor: 'pointer', border: groupFilter === g ? '1px solid var(--color-border-active)' : '1px solid transparent', background: groupFilter === g ? 'var(--color-surface-hover)' : 'transparent', color: groupFilter === g ? 'var(--color-text)' : 'var(--color-text-muted)' }}
                   >
                     <Layers size={10} color={groupFilter === g ? '#e53e3e' : '#444'} />
                     {g}
@@ -565,121 +692,116 @@ export default function Overview() {
             )}
           </div>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                {['Monitor', 'Status', 'Uptime', 'Response Time', 'Last Check', 'Next Check', ''].map(h => (
-                  <th key={h} style={{ padding: '8px 16px', textAlign: 'left', fontSize: 11, color: 'var(--color-text-dim)', fontWeight: 500, borderTop: '1px solid var(--color-row-divider)', borderBottom: '1px solid var(--color-row-divider)' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredMonitors.slice(0, 8).map((m, idx) => {
-                const bars = Array(14).fill(m.status === 'pending' ? 'up' : m.status) as MonitorStatus[]
-                return (
-                  <tr key={m.id} style={{ borderBottom: idx < Math.min(filteredMonitors.length, 8) - 1 ? '1px solid var(--color-row-divider)' : 'none' }}>
-                    <td style={{ padding: '10px 16px' }}>
-                      <div style={{ fontSize: 13, color: 'var(--color-text)', fontWeight: 500 }}>{m.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--color-text-dim)', marginTop: 1 }}>{m.url}</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-                        {m.group_name && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--color-text-muted)', background: 'var(--color-surface-2)', padding: '1px 6px', borderRadius: 8, border: '1px solid var(--color-border)' }}>
-                            <Layers size={9} color="#555" />{m.group_name}
-                          </span>
-                        )}
-                        {m.labels.map(l => <LabelChip key={l} label={l} />)}
-                      </div>
-                    </td>
-                    <td style={{ padding: '10px 16px' }}>
-                      <StatusBadge status={m.status} />
-                    </td>
-                    <td style={{ padding: '10px 16px', fontSize: 13, color: 'var(--color-text-muted)' }}>
-                      {m.uptime_percentage === 100 ? '100%' : `${m.uptime_percentage.toFixed(2)}%`}
-                    </td>
-                    <td style={{ padding: '10px 16px', fontSize: 13, color: 'var(--color-text-muted)' }}>
-                      {m.last_response_time != null ? `${m.last_response_time}ms` : '—'}
-                    </td>
-                    <td style={{ padding: '10px 16px', fontSize: 12, color: 'var(--color-text-dim)' }}>
-                      {m.last_checked_at ? timeAgo(m.last_checked_at) : '—'}
-                    </td>
-                    <td style={{ padding: '10px 16px' }}>
-                      <NextCheckBar lastCheckedAt={m.last_checked_at} intervalSeconds={m.interval} />
-                    </td>
-                    <td style={{ padding: '10px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <MiniSparkline data={bars} width={56} height={18} />
-                        <div style={{ position: 'relative' }}>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(prev => prev === m.id ? null : m.id) }}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-faint)', padding: 2, display: 'flex', alignItems: 'center', borderRadius: 4 }}
-                          >
-                            <MoreVertical size={14} />
-                          </button>
-                          {openMenuId === m.id && (
-                            <>
-                              <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setOpenMenuId(null)} />
-                              <div style={{
-                                position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 50,
-                                background: 'var(--color-surface-2)', border: '1px solid var(--color-border)',
-                                borderRadius: 6, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', minWidth: 160, overflow: 'hidden',
-                              }}>
-                                <button
-                                  onClick={() => { setOpenMenuId(null); navigate('/monitors') }}
-                                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer' }}
-                                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-hover)')}
-                                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                                >
-                                  <Edit2 size={13} /> Edit
-                                </button>
-                                <button
-                                  onClick={() => { setOpenMenuId(null); navigate(`/monitors`) }}
-                                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer' }}
-                                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-hover)')}
-                                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                                >
-                                  <FileText size={13} /> View Logs
-                                </button>
-                                <button
-                                  onClick={() => { toggleFavorite.mutate({ id: m.id, favorite: !m.favorite }); setOpenMenuId(null) }}
-                                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer' }}
-                                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-hover)')}
-                                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                                >
-                                  <Star size={13} fill={m.favorite ? '#f6ad55' : 'none'} color={m.favorite ? '#f6ad55' : 'currentColor'} />
-                                  {m.favorite ? 'Unfavorite' : 'Favorite'}
-                                </button>
-                                <div style={{ height: 1, background: 'var(--color-border)', margin: '2px 0' }} />
-                                <button
-                                  onClick={() => {
-                                    if (confirm(`Delete monitor "${m.name}"?`)) {
-                                      deleteMonitor.mutate(m.id)
-                                    }
-                                    setOpenMenuId(null)
-                                  }}
-                                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', color: '#fc8181', fontSize: 12, cursor: 'pointer' }}
-                                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(252,129,129,0.1)')}
-                                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                                >
-                                  <Trash2 size={13} /> Delete
-                                </button>
-                              </div>
-                            </>
+          {/* ── Desktop table ── */}
+          <div className="monitor-table-desktop">
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  {['Monitor', 'Status', 'Uptime', 'Response Time', 'Last Check', 'Next Check', ''].map(h => (
+                    <th key={h} style={{ padding: '8px 16px', textAlign: 'left', fontSize: 11, color: 'var(--color-text-dim)', fontWeight: 500, borderTop: '1px solid var(--color-row-divider)', borderBottom: '1px solid var(--color-row-divider)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredMonitors.slice(0, 8).map((m, idx) => {
+                  const bars = Array(14).fill(m.status === 'pending' ? 'up' : m.status) as MonitorStatus[]
+                  return (
+                    <tr key={m.id} style={{ borderBottom: idx < Math.min(filteredMonitors.length, 8) - 1 ? '1px solid var(--color-row-divider)' : 'none' }}>
+                      <td style={{ padding: '10px 16px' }}>
+                        <div style={{ fontSize: 13, color: 'var(--color-text)', fontWeight: 500 }}>{m.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--color-text-dim)', marginTop: 1 }}>{m.url}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                          {m.group_name && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, color: 'var(--color-text-muted)', background: 'var(--color-surface-2)', padding: '1px 6px', borderRadius: 8, border: '1px solid var(--color-border)' }}>
+                              <Layers size={9} color="#555" />{m.group_name}
+                            </span>
                           )}
+                          {m.labels.map(l => <LabelChip key={l} label={l} />)}
                         </div>
-                      </div>
+                      </td>
+                      <td style={{ padding: '10px 16px' }}><StatusBadge status={m.status} /></td>
+                      <td style={{ padding: '10px 16px', fontSize: 13, color: 'var(--color-text-muted)' }}>
+                        {m.uptime_percentage === 100 ? '100%' : `${m.uptime_percentage.toFixed(2)}%`}
+                      </td>
+                      <td style={{ padding: '10px 16px', fontSize: 13, color: 'var(--color-text-muted)' }}>
+                        {m.last_response_time != null ? `${m.last_response_time}ms` : '—'}
+                      </td>
+                      <td style={{ padding: '10px 16px', fontSize: 12, color: 'var(--color-text-dim)' }}>
+                        {m.last_checked_at ? timeAgo(m.last_checked_at) : '—'}
+                      </td>
+                      <td style={{ padding: '10px 16px' }}>
+                        <NextCheckBar lastCheckedAt={m.last_checked_at} intervalSeconds={m.interval} />
+                      </td>
+                      <td style={{ padding: '10px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <MiniSparkline data={bars} width={56} height={18} />
+                          <div style={{ position: 'relative' }}>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setOpenMenuId(prev => prev === m.id ? null : m.id) }}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-faint)', padding: 2, display: 'flex', alignItems: 'center', borderRadius: 4 }}
+                            >
+                              <MoreVertical size={14} />
+                            </button>
+                            {openMenuId === m.id && (
+                              <>
+                                <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setOpenMenuId(null)} />
+                                <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 50, background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 6, boxShadow: '0 8px 24px rgba(0,0,0,0.4)', minWidth: 160, overflow: 'hidden' }}>
+                                  <button onClick={() => { setOpenMenuId(null); navigate('/monitors') }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-hover)')} onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                                    <Edit2 size={13} /> Edit
+                                  </button>
+                                  <button onClick={() => { setOpenMenuId(null); navigate('/monitors') }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-hover)')} onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                                    <FileText size={13} /> View Logs
+                                  </button>
+                                  <button onClick={() => { toggleFavorite.mutate({ id: m.id, favorite: !m.favorite }); setOpenMenuId(null) }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-hover)')} onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
+                                    <Star size={13} fill={m.favorite ? '#f6ad55' : 'none'} color={m.favorite ? '#f6ad55' : 'currentColor'} />
+                                    {m.favorite ? 'Unfavorite' : 'Favorite'}
+                                  </button>
+                                  <div style={{ height: 1, background: 'var(--color-border)', margin: '2px 0' }} />
+                                  <button
+                                    onClick={() => { if (confirm(`Delete monitor "${m.name}"?`)) deleteMonitor.mutate(m.id); setOpenMenuId(null) }}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 12px', background: 'none', border: 'none', color: '#fc8181', fontSize: 12, cursor: 'pointer' }}
+                                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(252,129,129,0.1)')}
+                                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                                  >
+                                    <Trash2 size={13} /> Delete
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {filteredMonitors.length === 0 && (
+                  <tr>
+                    <td colSpan={7} style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--color-text-dim)', fontSize: 12 }}>
+                      No monitors match your search
                     </td>
                   </tr>
-                )
-              })}
-              {filteredMonitors.length === 0 && (
-                <tr>
-                  <td colSpan={7} style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--color-text-dim)', fontSize: 12 }}>
-                    No monitors match your search
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ── Mobile card list ── */}
+          <div className="monitor-cards-mobile">
+            {filteredMonitors.slice(0, 8).map(m => (
+              <MonitorCard
+                key={m.id}
+                m={m}
+                onDelete={id => deleteMonitor.mutate(id)}
+                onToggleFavorite={(id, fav) => toggleFavorite.mutate({ id, favorite: fav })}
+              />
+            ))}
+            {filteredMonitors.length === 0 && (
+              <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--color-text-dim)', fontSize: 12 }}>
+                No monitors match your search
+              </div>
+            )}
+          </div>
+
           {(monitors.length > 8 || filteredMonitors.length > 8) && (
             <div style={{ padding: '10px 16px', borderTop: '1px solid var(--color-border-subtle)', display: 'flex', justifyContent: 'center' }}>
               <button onClick={() => navigate('/monitors')} style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -689,14 +811,14 @@ export default function Overview() {
           )}
         </Card>
 
-        {/* Incidents */}
+        {/* ── Incidents ── */}
         <Card>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px 10px' }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Incidents</span>
             <button onClick={() => navigate('/incidents')} style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 12, cursor: 'pointer' }}>View all</button>
           </div>
           <div style={{ padding: '0 16px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {incidents.slice(0, 3).map(inc => {
+            {incidents.slice(0, isMobile ? 5 : 3).map(inc => {
               const st = incidentStatusStyle[inc.status] ?? incidentStatusStyle.investigating
               return (
                 <div key={inc.id} style={{ padding: '10px 12px', background: 'var(--color-input-bg)', borderRadius: 6, borderLeft: `3px solid ${st.color}` }}>
@@ -767,6 +889,3 @@ function DonutChart({ up, degraded, down, total, size = 112, strokeWidth = 10 }:
     </svg>
   )
 }
-
-// suppress unused warning
-void 0

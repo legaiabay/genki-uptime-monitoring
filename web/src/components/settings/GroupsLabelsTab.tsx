@@ -11,6 +11,7 @@ import {
   type GroupSummary,
   type LabelSummary,
 } from '@/hooks/useGroupsLabels'
+import { useBreakpoint } from '@/hooks/useBreakpoint'
 
 // ── shared styles ─────────────────────────────────────────────────────────────
 
@@ -463,8 +464,9 @@ function LabelsSection() {
 // ── exported tab ──────────────────────────────────────────────────────────────
 
 export default function GroupsLabelsTab() {
+  const { isMobile } = useBreakpoint()
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, alignItems: 'start' }}>
       <GroupsSection />
       <LabelsSection />
     </div>

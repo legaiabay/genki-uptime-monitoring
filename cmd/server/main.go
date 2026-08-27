@@ -8,11 +8,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/api"
-	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/applog"
-	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/config"
-	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/database"
-	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/scheduler"
+	"github.com/legaiabay/genki-uptime-monitoring/internal/api"
+	"github.com/legaiabay/genki-uptime-monitoring/internal/applog"
+	"github.com/legaiabay/genki-uptime-monitoring/internal/config"
+	"github.com/legaiabay/genki-uptime-monitoring/internal/database"
+	"github.com/legaiabay/genki-uptime-monitoring/internal/scheduler"
 )
 
 func main() {

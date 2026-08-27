@@ -20,9 +20,16 @@ export default function UptimeBars({ data, width = 120, height = 28 }: Props) {
   const gap = 1
   const count = Math.min(data.length, Math.floor(width / (barW + gap)))
   const slice = data.slice(-count)
+  const viewW = slice.length * (barW + gap)
 
   return (
-    <svg width={width} height={height} style={{ display: 'block' }}>
+    <svg
+      viewBox={`0 0 ${viewW || width} ${height}`}
+      width="100%"
+      height={height}
+      preserveAspectRatio="xMinYMid meet"
+      style={{ display: 'block', maxWidth: width }}
+    >
       {slice.map((s, i) => (
         <rect
           key={i}

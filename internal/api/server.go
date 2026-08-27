@@ -3,10 +3,10 @@ package api
 import (
 	"context"
 
-	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/api/handlers"
-	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/api/middleware"
-	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/applog"
-	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/config"
+	"github.com/legaiabay/genki-uptime-monitoring/internal/api/handlers"
+	"github.com/legaiabay/genki-uptime-monitoring/internal/api/middleware"
+	"github.com/legaiabay/genki-uptime-monitoring/internal/applog"
+	"github.com/legaiabay/genki-uptime-monitoring/internal/config"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	echomiddleware "github.com/labstack/echo/v4/middleware"
@@ -62,8 +62,6 @@ func (s *Server) registerRoutes(logBuf *applog.Buffer) {
 	protected.POST("/settings/reset-monitoring", appSettingsHandler.ResetMonitoringData)
 	protected.GET("/settings/show-url", appSettingsHandler.GetShowURL)
 	protected.PATCH("/settings/show-url", appSettingsHandler.SetShowURL)
-	protected.PATCH("/settings/show-url", appSettingsHandler.SetShowURL)
-	protected.GET("/settings/show-url", appSettingsHandler.GetShowURL)
 
 	// App logs
 	logHandler := handlers.NewLogHandler(logBuf)
@@ -134,6 +132,10 @@ func (s *Server) registerRoutes(logBuf *applog.Buffer) {
 	// Uptime time-series
 	uptimeSeriesHandler := handlers.NewUptimeSeriesHandler(s.db)
 	protected.GET("/stats/uptime-series", uptimeSeriesHandler.GetSeries)
+
+	// Version check — protected so only logged-in users see it
+	versionHandler := handlers.NewVersionHandler()
+	protected.GET("/version", versionHandler.GetVersion)
 
 	// WebSocket — passes logBuf so it can stream live log entries
 	wsHandler := handlers.NewWebSocketHandler(s.db, logBuf)

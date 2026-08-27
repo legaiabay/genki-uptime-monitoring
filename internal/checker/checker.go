@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/models"
+	"github.com/legaiabay/genki-uptime-monitoring/internal/models"
 )
 
 // Result holds the outcome of a single monitor check.

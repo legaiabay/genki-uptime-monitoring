@@ -81,6 +81,13 @@ export interface ApiKey {
   created_at: string
 }
 
+export interface VersionInfo {
+  current: string
+  latest: string
+  update_available: boolean
+  release_url: string
+}
+
 export interface ApiResponse<T> {
   data: T
   message?: string
