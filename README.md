@@ -49,7 +49,62 @@ Genki monitors your HTTP endpoints, TCP ports, and services on a configurable sc
 
 ## Quick Start
 
-### With Docker (recommended)
+### Pull from Docker Hub (easiest)
+
+No build step needed — pull the pre-built image directly.
+
+1. Create a `docker-compose.yml`:
+
+```yaml
+services:
+  app:
+    image: legaiabay/genki-uptime-monitoring:latest
+    container_name: genki-app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_ENV=production
+      - DATABASE_URL=postgres://genki:yourpassword@db:5432/genki?sslmode=disable
+      - JWT_SECRET=your-32-char-random-secret
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    container_name: genki-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=genki
+      - POSTGRES_PASSWORD=yourpassword
+      - POSTGRES_DB=genki
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U genki -d genki"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+```
+
+2. Start the stack:
+
+```bash
+docker compose up -d
+```
+
+Open `http://localhost:8080`. On first run, Genki redirects to `/setup` where you create your admin account.
+
+```bash
+# Generate secure secrets
+openssl rand -hex 32   # use for JWT_SECRET (and optionally RESET_SECRET)
+```
+
+### Build from source
 
 ```bash
 cp .env.example .env
