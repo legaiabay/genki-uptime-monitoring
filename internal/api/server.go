@@ -3,13 +3,13 @@ package api
 import (
 	"context"
 
+	"github.com/jmoiron/sqlx"
+	"github.com/labstack/echo/v4"
+	echomiddleware "github.com/labstack/echo/v4/middleware"
 	"github.com/legaiabay/genki-uptime-monitoring/internal/api/handlers"
 	"github.com/legaiabay/genki-uptime-monitoring/internal/api/middleware"
 	"github.com/legaiabay/genki-uptime-monitoring/internal/applog"
 	"github.com/legaiabay/genki-uptime-monitoring/internal/config"
-	"github.com/jmoiron/sqlx"
-	"github.com/labstack/echo/v4"
-	echomiddleware "github.com/labstack/echo/v4/middleware"
 )
 
 type Server struct {
@@ -68,11 +68,12 @@ func (s *Server) registerRoutes(logBuf *applog.Buffer) {
 	protected.GET("/logs", logHandler.Snapshot)
 
 	// Monitors
-	monitorHandler := handlers.NewMonitorHandler(s.db)
+	monitorHandler := handlers.NewMonitorHandler(s.db, s.cfg.DBEncryptionKey)
 	protected.GET("/monitors", monitorHandler.List)
 	protected.POST("/monitors", monitorHandler.Create)
 	protected.GET("/monitors/groups", monitorHandler.ListGroups)
 	protected.PATCH("/monitors/bulk", monitorHandler.BulkUpdate)
+	protected.POST("/monitors/test", monitorHandler.TestConnection)
 	protected.GET("/monitors/:id", monitorHandler.Get)
 	protected.PUT("/monitors/:id", monitorHandler.Update)
 	protected.DELETE("/monitors/:id", monitorHandler.Delete)

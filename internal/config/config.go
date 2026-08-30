@@ -8,11 +8,16 @@ import (
 )
 
 type Config struct {
-	Port        string
-	DatabaseURL string
-	JWTSecret   string
-	Environment string
-	ResetSecret string
+	Port          string
+	DatabaseURL   string
+	JWTSecret     string
+	Environment   string
+	ResetSecret   string
+	// DBEncryptionKey is a 32-byte hex-encoded key used to AES-256-GCM encrypt
+	// database monitor connection strings at rest. Generate with:
+	//   openssl rand -hex 32
+	// If left empty, connection strings are stored in plaintext (not recommended).
+	DBEncryptionKey string
 }
 
 func Load() (*Config, error) {
@@ -20,11 +25,12 @@ func Load() (*Config, error) {
 	_ = godotenv.Load()
 
 	cfg := &Config{
-		Port:        getEnv("PORT", ":8080"),
-		DatabaseURL: getEnv("DATABASE_URL", ""),
-		JWTSecret:   getEnv("JWT_SECRET", ""),
-		Environment: getEnv("APP_ENV", "development"),
-		ResetSecret: getEnv("RESET_SECRET", ""),
+		Port:            getEnv("PORT", ":8080"),
+		DatabaseURL:     getEnv("DATABASE_URL", ""),
+		JWTSecret:       getEnv("JWT_SECRET", ""),
+		Environment:     getEnv("APP_ENV", "development"),
+		ResetSecret:     getEnv("RESET_SECRET", ""),
+		DBEncryptionKey: getEnv("DB_ENCRYPTION_KEY", ""),
 	}
 
 	if cfg.DatabaseURL == "" {

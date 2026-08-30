@@ -41,7 +41,7 @@ func main() {
 	}
 
 	// Init scheduler
-	sched := scheduler.New(db)
+	sched := scheduler.New(db, cfg.DBEncryptionKey)
 	sched.Start()
 	defer sched.Stop()
 

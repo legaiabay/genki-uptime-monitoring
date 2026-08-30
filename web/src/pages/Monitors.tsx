@@ -4,7 +4,7 @@ import {
   Plus, Search, MoreVertical, Pencil, Trash2, RefreshCw,
   X, Check, Globe, ExternalLink, Tag, Layers, ChevronDown, ChevronRight,
   CheckSquare, Square, Edit2, FolderOpen, Star, ShieldCheck, ShieldAlert, ShieldOff,
-  SlidersHorizontal,
+  SlidersHorizontal, Zap,
 } from 'lucide-react'
 import Card from '@/components/ui/Card'
 import StatusBadge from '@/components/ui/StatusBadge'
@@ -19,8 +19,11 @@ import {
   useToggleFavorite,
   useGroups,
   useBulkUpdateMonitors,
+  useTestMonitor,
   type CreateMonitorPayload,
   type BulkUpdatePayload,
+  type TestMonitorPayload,
+  type TestMonitorResult,
 } from '@/hooks/useMonitors'
 import { useShowURLSetting, useToggleShowURL } from '@/hooks/useShowURLSetting'
 import { useBreakpoint } from '@/hooks/useBreakpoint'
@@ -46,7 +49,11 @@ function labelColor(label: string) {
   return LABEL_COLORS[Math.abs(hash) % LABEL_COLORS.length]
 }
 
-const emptyForm: CreateMonitorPayload = {
+const emptyForm: CreateMonitorPayload & {
+  db_input_mode: 'fields' | 'dsn'
+  db_host: string; db_port: string; db_user: string
+  db_password: string; db_name: string; db_ssl: boolean
+} = {
   name: '',
   url: '',
   type: 'http',
@@ -61,6 +68,10 @@ const emptyForm: CreateMonitorPayload = {
   ssl_warning_days: 30,
   grpc_service: '',
   grpc_method: '',
+  db_driver: 'postgresql',
+  db_connection_string: '',
+  db_input_mode: 'fields',
+  db_host: '', db_port: '', db_user: '', db_password: '', db_name: '', db_ssl: false,
 }
 
 // ── SSL expiry badge ──────────────────────────────────────────────────────────
@@ -101,6 +112,32 @@ function SSLBadge({ expiryDate, warningDays }: { expiryDate: string; warningDays
     >
       <Icon size={9} />
       {label}
+    </span>
+  )
+}
+
+// ── DB driver badge ───────────────────────────────────────────────────────────
+
+const DB_DRIVER_META: Record<string, { label: string; color: string }> = {
+  postgresql: { label: 'PostgreSQL',      color: '#336791' },
+  mysql:      { label: 'MySQL / MariaDB', color: '#00758f' },
+  mariadb:    { label: 'MySQL / MariaDB', color: '#00758f' },
+  redis:      { label: 'Redis',           color: '#d82c20' },
+  mongodb:    { label: 'MongoDB',         color: '#4db33d' },
+}
+
+function DBDriverBadge({ driver }: { driver: string }) {
+  const meta = DB_DRIVER_META[driver] ?? { label: driver || 'Database', color: '#888' }
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      fontSize: 10, fontWeight: 600,
+      padding: '2px 7px', borderRadius: 10,
+      background: `${meta.color}18`, color: meta.color,
+      border: `1px solid ${meta.color}40`,
+      letterSpacing: '0.02em',
+    }}>
+      {meta.label}
     </span>
   )
 }
@@ -262,12 +299,21 @@ function GroupInput({
   )
 }
 
+// ── DB DSN placeholder hints per driver ───────────────────────────────────────
+
+const DB_DSN_PLACEHOLDERS: Record<string, string> = {
+  postgresql: 'postgres://user:pass@host:5432/dbname?sslmode=disable',
+  mysql:      'user:pass@tcp(host:3306)/dbname',
+  redis:      'redis://:password@host:6379/0',
+  mongodb:    'mongodb://user:pass@host:27017/dbname',
+}
+
 // ── Monitor create/edit modal ─────────────────────────────────────────────────
 
 interface MonitorFormState {
   name: string
   url: string
-  type: 'http' | 'tcp' | 'ping' | 'dns' | 'ssl' | 'grpc' | 'udp'
+  type: 'http' | 'tcp' | 'ping' | 'dns' | 'ssl' | 'grpc' | 'udp' | 'database'
   interval: string
   timeout: string
   expected_status: string
@@ -279,12 +325,69 @@ interface MonitorFormState {
   ssl_warning_days: string
   grpc_service: string
   grpc_method: string
+  db_driver: string
+  db_connection_string: string
+  // Database input mode — 'fields' shows individual inputs, 'dsn' shows raw DSN
+  db_input_mode: 'fields' | 'dsn'
+  db_host: string
+  db_port: string
+  db_user: string
+  db_password: string
+  db_name: string
+  db_ssl: boolean
+}
+
+// Default ports per driver
+const DB_DEFAULT_PORTS: Record<string, string> = {
+  postgresql: '5432',
+  mysql:      '3306',
+  redis:      '6379',
+  mongodb:    '27017',
+}
+
+// Assemble a DSN from individual connection fields
+function buildDSN(f: MonitorFormState): string {
+  const host = f.db_host.trim() || 'localhost'
+  const port = f.db_port.trim() || DB_DEFAULT_PORTS[f.db_driver] || '5432'
+  const user = encodeURIComponent(f.db_user.trim())
+  const pass = encodeURIComponent(f.db_password)
+  const name = f.db_name.trim()
+
+  switch (f.db_driver) {
+    case 'mysql': {
+      // go-sql-driver/mysql DSN: user:pass@tcp(host:port)/dbname
+      const auth = f.db_user.trim() ? `${f.db_user.trim()}:${f.db_password}@` : ''
+      return `${auth}tcp(${host}:${port})/${name}`
+    }
+    case 'redis': {
+      // redis://:pass@host:port/db — db defaults to 0
+      const dbIndex = name || '0'
+      const auth = f.db_password ? `:${encodeURIComponent(f.db_password)}@` : ''
+      return `redis://${auth}${host}:${port}/${dbIndex}`
+    }
+    case 'mongodb': {
+      const auth = f.db_user.trim() ? `${user}:${pass}@` : ''
+      const db = name ? `/${name}` : ''
+      return `mongodb://${auth}${host}:${port}${db}`
+    }
+    default: {
+      // postgresql: postgres://user:pass@host:port/dbname?sslmode=...
+      const auth = f.db_user.trim() ? `${user}:${pass}@` : ''
+      const db = name ? `/${name}` : ''
+      const ssl = f.db_ssl ? 'require' : 'disable'
+      return `postgres://${auth}${host}:${port}${db}?sslmode=${ssl}`
+    }
+  }
 }
 
 function payloadFromFormState(f: MonitorFormState): CreateMonitorPayload {
+  const dbConnectionString = f.type === 'database' && f.db_input_mode === 'fields'
+    ? buildDSN(f)
+    : f.db_connection_string
+
   return {
     name: f.name,
-    url: f.url,
+    url: f.type === 'database' ? (f.db_driver + '://<encrypted>') : f.url,
     type: f.type,
     interval: Number(f.interval),
     timeout: Number(f.timeout),
@@ -297,6 +400,8 @@ function payloadFromFormState(f: MonitorFormState): CreateMonitorPayload {
     ssl_warning_days: Number(f.ssl_warning_days) || 30,
     grpc_service: f.grpc_service,
     grpc_method: f.grpc_method,
+    db_driver: f.db_driver,
+    db_connection_string: dbConnectionString,
   }
 }
 
@@ -307,7 +412,7 @@ function MonitorModal({
   loading,
   groups,
 }: {
-  initial?: Partial<CreateMonitorPayload>
+  initial?: Partial<CreateMonitorPayload> & { db_connection_string_set?: boolean }
   onClose: () => void
   onSave: (p: CreateMonitorPayload) => void
   loading: boolean
@@ -328,16 +433,67 @@ function MonitorModal({
     ssl_warning_days: String(initial?.ssl_warning_days ?? 30),
     grpc_service: initial?.grpc_service ?? '',
     grpc_method: initial?.grpc_method ?? '',
+    db_driver: initial?.db_driver ?? 'postgresql',
+    db_connection_string: '',  // never pre-populate — DSN is write-only
+    db_input_mode: 'fields',
+    db_host: '', db_port: '', db_user: '', db_password: '', db_name: '', db_ssl: false,
   })
 
   const set = <K extends keyof MonitorFormState>(k: K, v: MonitorFormState[K]) =>
     setForm(f => ({ ...f, [k]: v }))
 
+  const testMutation = useTestMonitor()
+  const [testResult, setTestResult] = useState<TestMonitorResult | null>(null)
+
   const numericFields: (keyof MonitorFormState)[] = ['interval', 'timeout', 'max_retries']
   const needsExpectedStatus = form.type === 'http'
+  const isDatabase = form.type === 'database'
   const hasInvalidNumbers = numericFields.some(k => form[k] === '' || isNaN(Number(form[k])) || Number(form[k]) <= 0)
     || (needsExpectedStatus && (form.expected_status === '' || isNaN(Number(form.expected_status)) || Number(form.expected_status) <= 0))
-  const canSave = !loading && form.name.trim() !== '' && form.url.trim() !== '' && !hasInvalidNumbers
+  // For database monitors: validate based on active input mode
+  const dbInvalid = isDatabase && (
+    form.db_driver === '' || (() => {
+      if (form.db_input_mode === 'dsn') {
+        return !initial?.db_connection_string_set && form.db_connection_string === ''
+      }
+      // fields mode — host is required; for non-redis a host is enough to attempt a connection
+      return form.db_host.trim() === ''
+    })()
+  )
+  const canSave = !loading && form.name.trim() !== '' && !hasInvalidNumbers && !dbInvalid &&
+    (isDatabase || form.url.trim() !== '')
+
+  // Can test when there's enough data to attempt a check (same rules as canSave
+  // except we don't require name).
+  const canTest = !testMutation.isPending && !dbInvalid &&
+    (isDatabase || form.url.trim() !== '')
+
+  async function handleTest() {
+    setTestResult(null)
+    const payload = payloadFromFormState(form)
+    const testPayload: TestMonitorPayload = {
+      monitor_id: (initial as { id?: number } | undefined)?.id,
+      type: payload.type,
+      url: payload.url,
+      timeout: payload.timeout,
+      expected_status: payload.expected_status,
+      dns_record_type: payload.dns_record_type,
+      dns_expected_ip: payload.dns_expected_ip,
+      ssl_warning_days: payload.ssl_warning_days,
+      grpc_service: payload.grpc_service,
+      grpc_method: payload.grpc_method,
+      db_driver: payload.db_driver,
+      db_connection_string: payload.db_connection_string,
+    }
+    try {
+      const result = await testMutation.mutateAsync(testPayload)
+      setTestResult(result)
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        ?? 'Test request failed'
+      setTestResult({ success: false, status: 'down', response_time: 0, message: msg })
+    }
+  }
 
   const inputStyle = {
     width: '100%', background: 'var(--color-input-bg)', border: '1px solid var(--color-border)',
@@ -387,11 +543,6 @@ function MonitorModal({
             </div>
           </div>
 
-          <div>
-            <label style={labelStyle}>URL</label>
-            <input style={inputStyle} value={form.url} onChange={e => set('url', e.target.value)} placeholder="https://example.com/health" />
-          </div>
-
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label style={labelStyle}>Monitor Type</label>
@@ -407,6 +558,7 @@ function MonitorModal({
                 <option value="ssl">SSL Certificate</option>
                 <option value="grpc">gRPC</option>
                 <option value="udp">UDP Port</option>
+                <option value="database">Database</option>
               </select>
             </div>
             {form.type === 'http' && (
@@ -439,6 +591,13 @@ function MonitorModal({
               </div>
             )}
           </div>
+
+          {!isDatabase && (
+            <div>
+              <label style={labelStyle}>URL</label>
+              <input style={inputStyle} value={form.url} onChange={e => set('url', e.target.value)} placeholder="https://example.com/health" />
+            </div>
+          )}
 
           {form.type === 'tcp' && (
             <p style={{ fontSize: 11, color: 'var(--color-text-dim)', margin: 0 }}>
@@ -474,7 +633,176 @@ function MonitorModal({
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+          {isDatabase && (
+            <>
+              {/* Driver + input mode row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Database Driver</label>
+                  <select
+                    style={{ ...inputStyle, cursor: 'pointer' }}
+                    value={form.db_driver}
+                    onChange={e => {
+                      const driver = e.target.value
+                      const defaultTimeouts: Record<string, string> = {
+                        mysql: '10', postgresql: '10', redis: '5', mongodb: '10',
+                      }
+                      set('db_driver', driver)
+                      // Auto-fill port when empty or already a known default
+                      const knownPorts = Object.values(DB_DEFAULT_PORTS)
+                      if (form.db_port === '' || knownPorts.includes(form.db_port)) {
+                        set('db_port', DB_DEFAULT_PORTS[driver] ?? '')
+                      }
+                      if (Object.values(defaultTimeouts).includes(form.timeout) || form.timeout === '30') {
+                        set('timeout', defaultTimeouts[driver] ?? '10')
+                      }
+                    }}
+                  >
+                    <option value="postgresql">PostgreSQL</option>
+                    <option value="mysql">MySQL / MariaDB</option>
+                    <option value="redis">Redis</option>
+                    <option value="mongodb">MongoDB</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Connection input</label>
+                  <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--color-border)' }}>
+                    {(['fields', 'dsn'] as const).map(mode => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => set('db_input_mode', mode)}
+                        style={{
+                          flex: 1, padding: '8px 0', fontSize: 12, cursor: 'pointer', border: 'none',
+                          background: form.db_input_mode === mode ? '#e53e3e' : 'var(--color-input-bg)',
+                          color: form.db_input_mode === mode ? '#fff' : 'var(--color-text-muted)',
+                          fontWeight: form.db_input_mode === mode ? 500 : 400,
+                          transition: 'background 0.15s, color 0.15s',
+                        }}
+                      >
+                        {mode === 'fields' ? 'Fields' : 'DSN'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Fields mode */}
+              {form.db_input_mode === 'fields' && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12 }}>
+                    <div>
+                      <label style={labelStyle}>Host</label>
+                      <input
+                        style={inputStyle}
+                        value={form.db_host}
+                        onChange={e => set('db_host', e.target.value)}
+                        placeholder="localhost"
+                      />
+                    </div>
+                    <div style={{ width: 90 }}>
+                      <label style={labelStyle}>Port</label>
+                      <input
+                        style={inputStyle}
+                        type="number"
+                        value={form.db_port || DB_DEFAULT_PORTS[form.db_driver] || ''}
+                        onChange={e => set('db_port', e.target.value)}
+                        placeholder={DB_DEFAULT_PORTS[form.db_driver]}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <label style={labelStyle}>
+                        Username
+                        {form.db_driver === 'redis' && (
+                          <span style={{ fontWeight: 400, color: 'var(--color-text-dim)', marginLeft: 4 }}>(not used)</span>
+                        )}
+                      </label>
+                      <input
+                        style={{ ...inputStyle, opacity: form.db_driver === 'redis' ? 0.4 : 1 }}
+                        value={form.db_user}
+                        onChange={e => set('db_user', e.target.value)}
+                        placeholder={form.db_driver === 'redis' ? '—' : 'username'}
+                        disabled={form.db_driver === 'redis'}
+                      />
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Password</label>
+                      <input
+                        type="password"
+                        style={inputStyle}
+                        value={form.db_password}
+                        onChange={e => set('db_password', e.target.value)}
+                        placeholder="••••••••"
+                        autoComplete="new-password"
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: form.db_driver === 'postgresql' ? '1fr auto' : '1fr', gap: 12 }}>
+                    <div>
+                      <label style={labelStyle}>
+                        {form.db_driver === 'redis' ? 'Database index' : 'Database name'}
+                        {form.db_driver !== 'redis' && (
+                          <span style={{ fontWeight: 400, color: 'var(--color-text-dim)', marginLeft: 4 }}>(optional)</span>
+                        )}
+                      </label>
+                      <input
+                        style={inputStyle}
+                        value={form.db_name}
+                        onChange={e => set('db_name', e.target.value)}
+                        placeholder={form.db_driver === 'redis' ? '0' : form.db_driver === 'mongodb' ? 'mydb' : 'mydb'}
+                      />
+                    </div>
+                    {form.db_driver === 'postgresql' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: 1 }}>
+                        <label style={{ ...labelStyle, marginBottom: 10 }}>SSL</label>
+                        <div
+                          onClick={() => set('db_ssl', !form.db_ssl)}
+                          title={form.db_ssl ? 'SSL required' : 'SSL disabled'}
+                          style={{ width: 36, height: 20, borderRadius: 10, cursor: 'pointer', background: form.db_ssl ? '#e53e3e' : '#2a2a2a', position: 'relative', transition: 'background 0.2s', flexShrink: 0, border: '1px solid var(--color-border)' }}
+                        >
+                          <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', position: 'absolute', top: 2, left: form.db_ssl ? 19 : 2, transition: 'left 0.2s' }} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <p style={{ fontSize: 11, color: 'var(--color-text-dim)', margin: '-4px 0 0' }}>
+                    Connection details are combined into an encrypted DSN before saving.
+                  </p>
+                </>
+              )}
+
+              {/* DSN mode */}
+              {form.db_input_mode === 'dsn' && (
+                <div>
+                  <label style={labelStyle}>
+                    Connection String
+                    {initial?.db_connection_string_set && (
+                      <span style={{ fontWeight: 400, color: '#48bb78', marginLeft: 6 }}>
+                        ✓ stored — leave blank to keep existing
+                      </span>
+                    )}
+                  </label>
+                  <input
+                    type="password"
+                    style={inputStyle}
+                    value={form.db_connection_string}
+                    onChange={e => set('db_connection_string', e.target.value)}
+                    placeholder={DB_DSN_PLACEHOLDERS[form.db_driver] ?? 'driver://user:pass@host:port/dbname'}
+                    autoComplete="new-password"
+                  />
+                  <p style={{ fontSize: 11, color: 'var(--color-text-dim)', margin: '5px 0 0' }}>
+                    Encrypted at rest (AES-256-GCM). Never returned by the API after saving.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
             <div>
               <label style={labelStyle}>Interval (s)</label>
               <input style={inputStyle} type="number" value={form.interval} onChange={e => set('interval', e.target.value)} />
@@ -503,24 +831,85 @@ function MonitorModal({
         </div>
 
         {/* footer */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '14px 20px', borderTop: '1px solid #222' }}>
-          <button onClick={onClose} style={{ background: 'none', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 13, padding: '7px 16px', cursor: 'pointer' }}>
-            Cancel
-          </button>
+        {/* Test result banner — shown above the action buttons */}
+        {testResult && (
+          <div style={{
+            padding: '10px 20px',
+            borderTop: '1px solid #222',
+            background: testResult.success ? 'rgba(72,187,120,0.08)' : 'rgba(229,62,62,0.08)',
+            display: 'flex', alignItems: 'flex-start', gap: 10,
+          }}>
+            <span style={{
+              flexShrink: 0, marginTop: 1,
+              width: 8, height: 8, borderRadius: '50%',
+              background: testResult.success ? '#48bb78' : '#e53e3e',
+              display: 'inline-block',
+              boxShadow: `0 0 6px ${testResult.success ? '#48bb78' : '#e53e3e'}`,
+            }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 500, color: testResult.success ? '#48bb78' : '#e53e3e', marginBottom: 2 }}>
+                {testResult.success ? `Connected successfully` : 'Connection failed'}
+                {testResult.response_time > 0 && (
+                  <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', marginLeft: 8 }}>
+                    {testResult.response_time}ms
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--color-text-dim)', wordBreak: 'break-word' }}>
+                {testResult.message}
+              </div>
+            </div>
+            <button
+              onClick={() => setTestResult(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-dim)', padding: 0, display: 'flex', flexShrink: 0 }}
+            >
+              <X size={12} />
+            </button>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '14px 20px', borderTop: '1px solid #222' }}>
+          {/* Test button — left side */}
           <button
-            onClick={() => onSave(payloadFromFormState(form))}
-            disabled={!canSave}
+            onClick={handleTest}
+            disabled={!canTest}
             style={{
-              background: loading ? '#8B1A1A' : '#e53e3e', border: 'none', borderRadius: 6,
-              color: '#fff', fontSize: 13, fontWeight: 500,
-              padding: '7px 20px', cursor: !canSave ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center', gap: 6,
-              opacity: !canSave ? 0.5 : 1,
+              background: testMutation.isPending ? 'rgba(56,178,172,0.15)' : 'rgba(56,178,172,0.12)',
+              border: `1px solid ${!canTest ? '#2a4a49' : '#38b2ac'}`,
+              borderRadius: 6,
+              color: !canTest ? '#2a5a58' : testMutation.isPending ? '#81e6d9' : '#38b2ac',
+              fontSize: 13, fontWeight: 500,
+              padding: '7px 14px', cursor: !canTest ? 'not-allowed' : 'pointer',
+              transition: 'border-color 0.15s, color 0.15s, background 0.15s',
             }}
           >
-            {loading ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
-            {initial?.name ? 'Save Changes' : 'Add Monitor'}
+            {testMutation.isPending
+              ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} />
+              : <Zap size={13} />}
+            Test
           </button>
+
+          {/* Cancel + Save — right side */}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={onClose} style={{ background: 'none', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-muted)', fontSize: 13, padding: '7px 16px', cursor: 'pointer' }}>
+              Cancel
+            </button>
+            <button
+              onClick={() => onSave(payloadFromFormState(form))}
+              disabled={!canSave}
+              style={{
+                background: loading ? '#8B1A1A' : '#e53e3e', border: 'none', borderRadius: 6,
+                color: '#fff', fontSize: 13, fontWeight: 500,
+                padding: '7px 20px', cursor: !canSave ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+                opacity: !canSave ? 0.5 : 1,
+              }}
+            >
+              {loading ? <RefreshCw size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={13} />}
+              {initial?.name ? 'Save Changes' : 'Add Monitor'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -846,7 +1235,7 @@ function MonitorCardMobile({
             )}
           </div>
           <div style={{ fontSize: 11, color: 'var(--color-text-dim)', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {m.url}
+            {m.type === 'database' ? <DBDriverBadge driver={m.db_driver} /> : m.url}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
             <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
@@ -1001,7 +1390,9 @@ function MonitorRow({
                 <SSLBadge expiryDate={m.ssl_expiry_date} warningDays={m.ssl_warning_days} />
               )}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-dim)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.url}</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text-dim)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {m.type === 'database' ? <DBDriverBadge driver={m.db_driver} /> : m.url}
+            </div>
             {m.labels.length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 5 }}>
                 {m.labels.map(l => <LabelChip key={l} label={l} />)}

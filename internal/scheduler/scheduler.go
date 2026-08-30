@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/legaiabay/genki-uptime-monitoring/internal/checker"
 	"github.com/legaiabay/genki-uptime-monitoring/internal/models"
 	"github.com/legaiabay/genki-uptime-monitoring/internal/notifier"
-	"github.com/jmoiron/sqlx"
 	"github.com/robfig/cron/v3"
 )
 
@@ -22,18 +22,19 @@ type Scheduler struct {
 	dispatcher *notifier.Dispatcher
 }
 
-func New(db *sqlx.DB) *Scheduler {
+func New(db *sqlx.DB, encKey string) *Scheduler {
 	return &Scheduler{
 		cron: cron.New(cron.WithSeconds()),
 		db:   db,
 		checkers: map[models.MonitorType]checker.Checker{
-			models.MonitorTypeHTTP: checker.NewHTTPChecker(),
-			models.MonitorTypeTCP:  checker.NewTCPChecker(),
-			models.MonitorTypePing: checker.NewPingChecker(),
-			models.MonitorTypeDNS:  checker.NewDNSChecker(),
-			models.MonitorTypeSSL:  checker.NewSSLChecker(),
-			models.MonitorTypeGRPC: checker.NewGRPCChecker(),
-			models.MonitorTypeUDP:  checker.NewUDPChecker(),
+			models.MonitorTypeHTTP:     checker.NewHTTPChecker(),
+			models.MonitorTypeTCP:      checker.NewTCPChecker(),
+			models.MonitorTypePing:     checker.NewPingChecker(),
+			models.MonitorTypeDNS:      checker.NewDNSChecker(),
+			models.MonitorTypeSSL:      checker.NewSSLChecker(),
+			models.MonitorTypeGRPC:     checker.NewGRPCChecker(),
+			models.MonitorTypeUDP:      checker.NewUDPChecker(),
+			models.MonitorTypeDatabase: checker.NewDatabaseChecker(encKey),
 		},
 		dispatcher: notifier.NewDispatcher(db),
 	}
@@ -63,7 +64,8 @@ func (s *Scheduler) runChecks() {
 		        expected_status, max_retries, uptime_percentage, last_checked_at,
 		        created_at, updated_at,
 		        dns_record_type, dns_expected_ip, ssl_warning_days,
-		        grpc_service, grpc_method
+		        grpc_service, grpc_method,
+		        db_driver, db_connection_string
 		 FROM monitors
 		 WHERE active = true
 		   AND (last_checked_at IS NULL

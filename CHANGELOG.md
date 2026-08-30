@@ -1,4 +1,22 @@
-# v1.3.2 (2026-08-27)
+# v1.3.3 (2026-08-30)
+
+## Features
+
+- **Database monitor type**: monitor MySQL/MariaDB, PostgreSQL, Redis, and MongoDB by pinging the server directly — no queries executed
+  - Connection strings are encrypted at rest using AES-256-GCM (`DB_ENCRYPTION_KEY` env var)
+  - Two input modes in the monitor form: guided **Fields** (host, port, user, password, database, SSL toggle) or raw **DSN**
+  - Driver badge shown in monitor list/cards instead of URL
+- **Test Connection button**: run a one-shot check from the Add/Edit monitor modal without saving — works for all monitor types (HTTP, TCP, DNS, SSL, gRPC, UDP, Database)
+  - Result banner shows status, response time, and the checker message inline in the footer
+  - For database monitors being edited, uses the stored encrypted DSN when no new credentials are provided
+
+## Changes
+
+- Monitor form field order updated: Monitor Type now appears before the URL field
+
+---
+
+# v1.3.2 (2026-08-28)
 
 ## Features
 

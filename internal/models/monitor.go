@@ -8,13 +8,14 @@ type MonitorType string
 type MonitorStatus string
 
 const (
-	MonitorTypeHTTP MonitorType = "http"
-	MonitorTypeTCP  MonitorType = "tcp"
-	MonitorTypePing MonitorType = "ping"
-	MonitorTypeDNS  MonitorType = "dns"
-	MonitorTypeSSL  MonitorType = "ssl"
-	MonitorTypeGRPC MonitorType = "grpc"
-	MonitorTypeUDP  MonitorType = "udp"
+	MonitorTypeHTTP     MonitorType = "http"
+	MonitorTypeTCP      MonitorType = "tcp"
+	MonitorTypePing     MonitorType = "ping"
+	MonitorTypeDNS      MonitorType = "dns"
+	MonitorTypeSSL      MonitorType = "ssl"
+	MonitorTypeGRPC     MonitorType = "grpc"
+	MonitorTypeUDP      MonitorType = "udp"
+	MonitorTypeDatabase MonitorType = "database"
 
 	MonitorStatusUp       MonitorStatus = "up"
 	MonitorStatusDown     MonitorStatus = "down"
@@ -48,6 +49,12 @@ type Monitor struct {
 	// gRPC-specific
 	GRPCService string `db:"grpc_service" json:"grpc_service"`
 	GRPCMethod  string `db:"grpc_method"  json:"grpc_method"`
+	// Database-specific
+	// DBDriver holds the engine name: mysql, mariadb, postgresql, redis, mongodb.
+	DBDriver string `db:"db_driver" json:"db_driver"`
+	// DBConnectionString holds the AES-256-GCM encrypted DSN (hex-encoded).
+	// The scheduler decrypts it at check time; the API never returns the raw value.
+	DBConnectionString string `db:"db_connection_string" json:"-"`
 }
 
 type MonitorLog struct {

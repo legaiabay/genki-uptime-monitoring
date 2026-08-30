@@ -5,7 +5,7 @@ import type { Monitor } from '@/types'
 export interface CreateMonitorPayload {
   name: string
   url: string
-  type: 'http' | 'tcp' | 'ping' | 'dns' | 'ssl' | 'grpc' | 'udp'
+  type: 'http' | 'tcp' | 'ping' | 'dns' | 'ssl' | 'grpc' | 'udp' | 'database'
   interval: number
   timeout: number
   expected_status: number
@@ -18,6 +18,9 @@ export interface CreateMonitorPayload {
   ssl_warning_days?: number
   grpc_service?: string
   grpc_method?: string
+  // Database monitor fields
+  db_driver?: string
+  db_connection_string?: string  // plaintext DSN — only sent on create/update, never returned
 }
 
 async function fetchMonitors(): Promise<Monitor[]> {
@@ -119,6 +122,37 @@ export interface BulkUpdatePayload {
   set_labels?: boolean
   favorite?: boolean
   set_favorite?: boolean
+}
+
+export interface TestMonitorPayload {
+  monitor_id?: number
+  type: string
+  url?: string
+  timeout?: number
+  expected_status?: number
+  dns_record_type?: string
+  dns_expected_ip?: string
+  ssl_warning_days?: number
+  grpc_service?: string
+  grpc_method?: string
+  db_driver?: string
+  db_connection_string?: string
+}
+
+export interface TestMonitorResult {
+  success: boolean
+  status: string
+  response_time: number
+  message: string
+}
+
+async function testMonitor(payload: TestMonitorPayload): Promise<TestMonitorResult> {
+  const res = await api.post<TestMonitorResult>('/monitors/test', payload)
+  return res.data
+}
+
+export function useTestMonitor() {
+  return useMutation({ mutationFn: testMonitor })
 }
 
 async function bulkUpdateMonitors(payload: BulkUpdatePayload): Promise<{ updated: number }> {

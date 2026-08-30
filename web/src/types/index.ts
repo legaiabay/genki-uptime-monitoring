@@ -1,4 +1,4 @@
-export type MonitorType = 'http' | 'tcp' | 'ping' | 'dns' | 'ssl' | 'grpc' | 'udp'
+export type MonitorType = 'http' | 'tcp' | 'ping' | 'dns' | 'ssl' | 'grpc' | 'udp' | 'database'
 export type MonitorStatus = 'up' | 'down' | 'degraded' | 'pending'
 export type IncidentStatus = 'investigating' | 'identified' | 'resolved'
 
@@ -30,6 +30,10 @@ export interface Monitor {
   ssl_expiry_date: string | null
   grpc_service: string
   grpc_method: string
+  // Database monitor fields
+  db_driver: string
+  // db_connection_string is never returned by the API; use db_connection_string_set instead
+  db_connection_string_set: boolean
 }
 
 export interface MonitorLog {

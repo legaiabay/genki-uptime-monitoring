@@ -19,7 +19,7 @@ Genki monitors your HTTP endpoints, TCP ports, and services on a configurable sc
 
 ## Features
 
-- **Monitor types** — HTTP, TCP, ping, DNS, SSL certificate, and gRPC health checks with configurable intervals and timeouts
+- **Monitor types** — HTTP, TCP, ping, DNS, SSL certificate, gRPC, and databases (MySQL/MariaDB, PostgreSQL, MongoDB, Redis, etc.) health checks with configurable intervals and timeouts
 - **SSL certificate monitoring** — tracks expiry date; warns when cert expires within a configurable threshold (days); expiry badge on monitor rows
 - **Uptime charts** — time-series sparklines at 1h / 6h / 24h / 7d / 30d resolution with response-time overlay; filter by favorites on the Overview page
 - **Groups & labels** — organise monitors into groups with colour-coded labels; filter and search by group or label across the dashboard
@@ -67,6 +67,7 @@ services:
       - APP_ENV=production
       - DATABASE_URL=postgres://genki:yourpassword@db:5432/genki?sslmode=disable
       - JWT_SECRET=your-32-char-random-secret
+      # - DB_ENCRYPTION_KEY=your-64-hex-char-key  # required for Database monitors
     depends_on:
       db:
         condition: service_healthy
@@ -143,6 +144,7 @@ See [docs/development.md](docs/development.md) for the full local setup guide.
 | `APP_ENV` | No | `development` | `development` or `production` |
 | `PORT` | No | `:8080` | HTTP listen address |
 | `RESET_SECRET` | No | — | Enables the forgot-password flow — see [Password Reset](#password-reset) |
+| `DB_ENCRYPTION_KEY` | No* | — | 64-char hex key (32 bytes) for AES-256-GCM encryption of database monitor connection strings. Required when using the **Database** monitor type. Generate with `openssl rand -hex 32`. |
 
 ### Password Reset
 
