@@ -5,6 +5,7 @@
 **Lightweight self-hosted uptime monitoring**
 
 [![Latest Release](https://img.shields.io/github/v/release/legaiabay/genki-uptime-monitoring?style=flat&label=version&color=brightgreen)](https://github.com/legaiabay/genki-uptime-monitoring/releases/latest)
+[![Docker Hub](https://img.shields.io/docker/pulls/legaiabay/genki-uptime-monitoring?style=flat&logo=docker&logoColor=white&label=Docker+Hub)](https://hub.docker.com/r/legaiabay/genki-uptime-monitoring)
 [![Go](https://img.shields.io/badge/Go-1.23-00ADD8?style=flat&logo=go&logoColor=white)](https://golang.org)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=flat&logo=react&logoColor=black)](https://react.dev)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat&logo=postgresql&logoColor=white)](https://postgresql.org)

@@ -9,7 +9,7 @@ COPY web/ ./
 RUN npm run build
 
 # ─── Stage 2: Build Go Binary ──────────────────────────────────────────────────
-FROM golang:1.23-alpine AS go-builder
+FROM golang:1.24-alpine AS go-builder
 
 WORKDIR /app
 
@@ -27,7 +27,10 @@ COPY . .
 COPY --from=frontend-builder /app/web/dist ./internal/api/web/dist
 
 ARG VERSION=dev
-RUN CGO_ENABLED=0 GOOS=linux go build \
+RUN CGO_ENABLED=0 GOOS=linux \
+    GOFLAGS="-p=2" \
+    GOGC=50 \
+    go build \
     -ldflags="-w -s -X github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/api/handlers.AppVersion=${VERSION}" \
     -o /app/bin/genki \
     ./cmd/server
