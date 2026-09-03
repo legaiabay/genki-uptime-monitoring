@@ -1,3 +1,11 @@
+# v1.3.4 (2026-09-03)
+
+## Fixes
+
+- **Max retries now enforced**: the scheduler previously ignored `max_retries` and sent a down notification on the first failure. It now retries the check up to `max_retries` times (5s apart) before creating an incident and dispatching notifications.
+
+---
+
 # v1.3.3 (2026-08-30)
 
 ## Features

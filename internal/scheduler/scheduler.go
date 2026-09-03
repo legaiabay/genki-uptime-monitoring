@@ -120,13 +120,39 @@ func (s *Scheduler) checkMonitor(ctx context.Context, mon *models.Monitor) {
 	}
 
 	timeout := time.Duration(mon.Timeout) * time.Second
-	checkCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
 
-	result, err := chk.Check(checkCtx, mon)
-	if err != nil {
-		log.Printf("[scheduler] check error for %s: %v", mon.Name, err)
-		return
+	// Determine how many times to attempt the check before declaring down.
+	// max_retries=0 means a single attempt (no retries); max_retries=N means
+	// up to N additional attempts after the first failure.
+	maxRetries := mon.MaxRetries
+	if maxRetries < 0 {
+		maxRetries = 0
+	}
+
+	var result *checker.Result
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		checkCtx, cancel := context.WithTimeout(ctx, timeout)
+		var err error
+		result, err = chk.Check(checkCtx, mon)
+		cancel()
+		if err != nil {
+			log.Printf("[scheduler] check error for %s (attempt %d/%d): %v", mon.Name, attempt+1, maxRetries+1, err)
+			// A hard error (context cancelled, etc.) — stop retrying.
+			return
+		}
+		if result.Status != models.MonitorStatusDown {
+			// Check passed — no need to retry.
+			break
+		}
+		if attempt < maxRetries {
+			log.Printf("[scheduler] %s is down (attempt %d/%d), retrying…", mon.Name, attempt+1, maxRetries+1)
+			// Short pause between retries to avoid hammering the target.
+			select {
+			case <-time.After(5 * time.Second):
+			case <-ctx.Done():
+				return
+			}
+		}
 	}
 
 	// Insert log
