@@ -1,3 +1,11 @@
+# v1.3.5 (2026-09-11)
+
+## Fixes
+
+- **Degraded status treated as up in uptime calculations**: SSL monitors in `degraded` state (certificate expiring soon) were previously counted as down in the Overview uptime chart and the per-monitor uptime percentage. Both the time-series query and the scheduler's uptime recalculation now count `degraded` alongside `up`.
+
+---
+
 # v1.3.4 (2026-09-03)
 
 ## Fixes

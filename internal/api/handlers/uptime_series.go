@@ -81,7 +81,7 @@ func (h *UptimeSeriesHandler) GetSeries(c echo.Context) error {
 			ml.monitor_id,
 			m.name AS monitor_name,
 			ROUND(
-				COUNT(*) FILTER (WHERE ml.status = 'up')::numeric
+				COUNT(*) FILTER (WHERE ml.status IN ('up', 'degraded'))::numeric
 				/ NULLIF(COUNT(*), 0) * 100,
 			2) AS uptime_pct,
 			COALESCE(

@@ -173,7 +173,7 @@ func (s *Scheduler) checkMonitor(ctx context.Context, mon *models.Monitor) {
 			   ssl_expiry_date = $3,
 			   uptime_percentage = (
 			     SELECT COALESCE(
-			       ROUND(COUNT(*) FILTER (WHERE status = 'up')::numeric / NULLIF(COUNT(*), 0) * 100, 2),
+			       ROUND(COUNT(*) FILTER (WHERE status IN ('up', 'degraded'))::numeric / NULLIF(COUNT(*), 0) * 100, 2),
 			       0
 			     )
 			     FROM monitor_logs WHERE monitor_id = $4 AND checked_at > NOW() - INTERVAL '24 hours'
@@ -188,7 +188,7 @@ func (s *Scheduler) checkMonitor(ctx context.Context, mon *models.Monitor) {
 			   last_checked_at = $2,
 			   uptime_percentage = (
 			     SELECT COALESCE(
-			       ROUND(COUNT(*) FILTER (WHERE status = 'up')::numeric / NULLIF(COUNT(*), 0) * 100, 2),
+			       ROUND(COUNT(*) FILTER (WHERE status IN ('up', 'degraded'))::numeric / NULLIF(COUNT(*), 0) * 100, 2),
 			       0
 			     )
 			     FROM monitor_logs WHERE monitor_id = $3 AND checked_at > NOW() - INTERVAL '24 hours'
