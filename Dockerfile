@@ -1,33 +1,48 @@
+# syntax=docker/dockerfile:1
+
 # ─── Stage 1: Build Frontend ───────────────────────────────────────────────────
 FROM node:22-alpine AS frontend-builder
 
 WORKDIR /app/web
+
+# Copy manifests first — this layer is cached until package*.json changes.
 COPY web/package*.json ./
-RUN npm ci --frozen-lockfile
+
+# Mount the npm download cache so packages are not re-fetched on every build.
+# The cache dir lives outside the image layer (never bloats the final image).
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
 
 COPY web/ ./
-RUN npm run build
+
+# Skip tsc type-checking here — that belongs in CI, not artifact production.
+# `build:docker` runs `vite build` only, which is ~2–3× faster than the full
+# `tsc -b && vite build` script.
+RUN npm run build:docker
 
 # ─── Stage 2: Build Go Binary ──────────────────────────────────────────────────
 FROM golang:1.24-alpine AS go-builder
 
 WORKDIR /app
 
-# Install build dependencies
 RUN apk add --no-cache git
 
-# Download Go modules first (cache layer)
+# Copy manifests first so module downloads are cached independently of source.
 COPY go.mod go.sum ./
-RUN go mod download
 
-# Copy source code
+# Mount the Go module cache and the build cache.
+# Both persist across builds and never end up in the image.
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+# Copy source and the built frontend.
 COPY . .
-
-# Copy built frontend into the expected embed path
 COPY --from=frontend-builder /app/web/dist ./internal/api/web/dist
 
 ARG VERSION=dev
-RUN CGO_ENABLED=0 GOOS=linux \
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux \
     GOFLAGS="-p=2" \
     GOGC=50 \
     go build \
