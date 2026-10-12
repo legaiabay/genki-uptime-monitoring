@@ -1,3 +1,13 @@
+# v1.3.5.1 (2026-10-12)
+
+## Performance
+
+- **`GET /api/v1/monitors` slow with many monitors**: the list endpoint ran a correlated subquery against `monitor_logs` for every monitor row to fetch `last_response_time`. With no composite index, each lookup had to sort all log rows for that monitor. With 40+ monitors this caused response times approaching 1 minute.
+  - Migration `00012` adds a composite index `(monitor_id, checked_at DESC)` on `monitor_logs` — PostgreSQL can now seek directly to the most recent entry per monitor without a sort pass
+  - Correlated subquery rewritten to `LEFT JOIN LATERAL` which uses the new composite index correctly and keeps `NULL` for monitors with no logs
+
+---
+
 # v1.3.5 (2026-09-11)
 
 ## Fixes

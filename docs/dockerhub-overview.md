@@ -6,7 +6,7 @@ Genki monitors your HTTP endpoints, TCP ports, DNS records, SSL certificates, an
 
 ## Features
 
-- **Monitor types** — HTTP, TCP, ping, DNS, SSL certificate, and gRPC health checks
+- **Monitor types** — HTTP, TCP, ping, DNS, SSL certificate, gRPC health checks, and **database** monitors (MySQL/MariaDB, PostgreSQL, Redis, MongoDB) — no queries executed, pure connection ping
 - **SSL certificate monitoring** — tracks expiry date; warns within a configurable threshold
 - **Uptime charts** — time-series sparklines at 1h / 6h / 24h / 7d / 30d with response-time overlay
 - **Groups & labels** — organise monitors; filter and search across the dashboard
@@ -79,6 +79,7 @@ Open `http://localhost:8080`. On first run, Genki redirects to `/setup` where yo
 | `APP_ENV` | No | `development` | `development` or `production` |
 | `PORT` | No | `:8080` | HTTP listen address |
 | `RESET_SECRET` | No | — | Enables the forgot-password flow |
+| `DB_ENCRYPTION_KEY` | No* | — | 64-char hex key for AES-256-GCM encryption of database monitor connection strings. Required when using the **Database** monitor type. Generate with `openssl rand -hex 32`. |
 
 ```bash
 # Generate secrets

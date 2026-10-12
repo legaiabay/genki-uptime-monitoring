@@ -104,7 +104,9 @@ genki-uptime-monitoring/
 │   │       ├── 00007_monitor_groups_labels.sql   # group_name, labels TEXT[]
 │   │       ├── 00008_add_monitor_favorite.sql    # favorite BOOLEAN
 │   │       ├── 00009_new_monitor_types.sql       # dns/ssl/grpc fields
-│   │       └── 00010_add_ssl_expiry_date.sql     # ssl_expiry_date TIMESTAMPTZ
+│   │       ├── 00010_add_ssl_expiry_date.sql     # ssl_expiry_date TIMESTAMPTZ
+│   │       ├── 00011_add_database_monitor.sql    # db_driver, db_connection_string
+│   │       └── 00012_optimize_monitor_logs_index.sql  # composite index (monitor_id, checked_at DESC)
 │   ├── models/                 # Go structs matching DB schema
 │   ├── notifier/               # Channel senders + fan-out dispatcher
 │   └── scheduler/scheduler.go  # Cron: check due monitors, insert logs, fire notifs
