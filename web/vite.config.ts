@@ -35,6 +35,11 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       emptyOutDir: true,
+      rollupOptions: {
+        // Default is 20. Lowering this reduces the number of files Rollup
+        // holds open simultaneously, which cuts peak RSS on low-memory hosts.
+        maxParallelFileOps: 10,
+      },
     },
   }
 })

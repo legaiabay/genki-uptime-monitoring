@@ -9,15 +9,17 @@ WORKDIR /app/web
 COPY web/package*.json ./
 
 # Mount the npm download cache so packages are not re-fetched on every build.
-# The cache dir lives outside the image layer (never bloats the final image).
 RUN --mount=type=cache,target=/root/.npm \
     npm ci
 
 COPY web/ ./
 
-# Skip tsc type-checking here — that belongs in CI, not artifact production.
-# `build:docker` runs `vite build` only, which is ~2–3× faster than the full
-# `tsc -b && vite build` script.
+# Cap Node.js V8 heap at 1 GB so the GC kicks in aggressively before the
+# OOM killer does. Rollup's peak RSS can exceed 1.5 GB with defaults, which
+# exhausts a t3.small (2 GB) when OS + Docker overhead is included.
+ENV NODE_OPTIONS="--max-old-space-size=1024"
+
+# `build:docker` runs `vite build` only (no tsc type-check).
 RUN npm run build:docker
 
 # ─── Stage 2: Build Go Binary ──────────────────────────────────────────────────
@@ -31,7 +33,6 @@ RUN apk add --no-cache git
 COPY go.mod go.sum ./
 
 # Mount the Go module cache and the build cache.
-# Both persist across builds and never end up in the image.
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
@@ -40,11 +41,19 @@ COPY . .
 COPY --from=frontend-builder /app/web/dist ./internal/api/web/dist
 
 ARG VERSION=dev
+
+# -p=1      — one compiler process at a time; prevents two concurrent
+#             compilations from doubling peak RSS.
+# GOGC=30   — GC triggers at 30% heap growth instead of the default 100%;
+#             trades a bit of CPU for much lower peak memory.
+# GOMEMLIMIT — hard cap on the Go runtime heap; forces collection before the
+#              OOM killer can fire. Leave ~400 MB headroom for OS + Docker.
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=linux \
-    GOFLAGS="-p=2" \
-    GOGC=50 \
+    GOFLAGS="-p=1" \
+    GOGC=30 \
+    GOMEMLIMIT=1200MiB \
     go build \
     -ldflags="-w -s -X github.com/abdulkhobirfauzi/genki-uptime-monitoring/internal/api/handlers.AppVersion=${VERSION}" \
     -o /app/bin/genki \

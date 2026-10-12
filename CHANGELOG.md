@@ -6,6 +6,19 @@
   - Migration `00012` adds a composite index `(monitor_id, checked_at DESC)` on `monitor_logs` — PostgreSQL can now seek directly to the most recent entry per monitor without a sort pass
   - Correlated subquery rewritten to `LEFT JOIN LATERAL` which uses the new composite index correctly and keeps `NULL` for monitors with no logs
 
+- **Docker build speed**: `npm run build` and `go build` are significantly faster on rebuilds
+  - `# syntax=docker/dockerfile:1` header enables BuildKit cache mounts
+  - `npm ci` now mounts `/root/.npm` as a persistent cache — packages are not re-downloaded when only source files change
+  - `go mod download` and `go build` mount `/go/pkg/mod` and `/root/.cache/go-build` — Go modules and incremental build artifacts are reused across builds
+  - Added `build:docker` script to `web/package.json` that runs `vite build` only, skipping `tsc -b` type-checking (which is expensive and belongs in CI, not artifact production)
+
+- **Docker build OOM on low-memory hosts (e.g. t3.small / 2 GB RAM)**: the build would silently hang or get killed by the OOM killer during the Rollup bundling and Go compilation phases
+  - `NODE_OPTIONS=--max-old-space-size=1024` caps the V8 heap at 1 GB — GC collects aggressively before the process can balloon to 1.5+ GB
+  - `rollupOptions.maxParallelFileOps: 10` (down from the default 20) reduces how many modules Rollup holds in memory simultaneously during bundling
+  - `GOFLAGS="-p=1"` drops Go compiler parallelism from 2 to 1 — halves peak RSS during compilation
+  - `GOGC=30` triggers Go GC at 30% heap growth instead of the default 100%, keeping heap size small at the cost of more frequent collection passes
+  - `GOMEMLIMIT=1200MiB` sets a hard ceiling on the Go runtime heap; GC will collect continuously rather than let the process exceed this limit and get OOM-killed
+
 ---
 
 # v1.3.5 (2026-09-11)

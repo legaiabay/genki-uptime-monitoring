@@ -23,11 +23,13 @@ The app will be available on the port configured in `PORT` (default `:8080`).
 
 The `Dockerfile` uses a three-stage build:
 
-1. **`frontend-builder`** — installs Node dependencies, runs `npm run build`
-2. **`go-builder`** — copies the frontend `dist` into the embed path, compiles the binary with `CGO_ENABLED=0`
+1. **`frontend-builder`** — installs Node dependencies via `npm ci` (with a persistent npm download cache mount), then runs `vite build` to produce the static assets
+2. **`go-builder`** — copies the frontend `dist` into the embed path, compiles the binary with `CGO_ENABLED=0`; Go module and build caches are mounted so subsequent builds only recompile changed packages
 3. **Final stage** — Alpine 3.20 with only the compiled binary
 
 Result: a single self-contained image of approximately 15–20 MB. No separate Node runtime or static file server is needed.
+
+> **BuildKit required.** The Dockerfile uses `--mount=type=cache` for both stages. Docker BuildKit is the default engine on Docker 23+ and Docker Desktop. If you are on an older setup, enable it with `DOCKER_BUILDKIT=1 docker compose up -d --build`.
 
 ## Makefile Shortcuts
 
