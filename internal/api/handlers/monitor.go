@@ -122,9 +122,16 @@ func (h *MonitorHandler) List(c echo.Context) error {
 		        m.dns_record_type, m.dns_expected_ip, m.ssl_warning_days, m.ssl_expiry_date,
 		        m.grpc_service, m.grpc_method,
 		        m.db_driver, m.db_connection_string,
-		        (SELECT l.response_time FROM monitor_logs l
-		         WHERE l.monitor_id = m.id ORDER BY l.checked_at DESC LIMIT 1) AS last_response_time
-		 FROM monitors m ORDER BY m.favorite DESC, m.group_name ASC, m.created_at DESC`)
+		        l.response_time AS last_response_time
+		 FROM monitors m
+		 LEFT JOIN LATERAL (
+		     SELECT response_time
+		     FROM monitor_logs
+		     WHERE monitor_id = m.id
+		     ORDER BY checked_at DESC
+		     LIMIT 1
+		 ) l ON true
+		 ORDER BY m.favorite DESC, m.group_name ASC, m.created_at DESC`)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to fetch monitors")
 	}
