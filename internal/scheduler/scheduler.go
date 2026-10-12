@@ -176,7 +176,13 @@ func (s *Scheduler) checkMonitor(ctx context.Context, mon *models.Monitor) {
 			       ROUND(COUNT(*) FILTER (WHERE status IN ('up', 'degraded'))::numeric / NULLIF(COUNT(*), 0) * 100, 2),
 			       0
 			     )
-			     FROM monitor_logs WHERE monitor_id = $4 AND checked_at > NOW() - INTERVAL '24 hours'
+			     FROM (
+			       SELECT status FROM monitor_logs
+			       WHERE monitor_id = $4
+			         AND checked_at > NOW() - INTERVAL '24 hours'
+			       ORDER BY checked_at DESC
+			       LIMIT 2880
+			     ) recent
 			   ),
 			   updated_at = NOW()
 			 WHERE id = $4`,
@@ -191,7 +197,13 @@ func (s *Scheduler) checkMonitor(ctx context.Context, mon *models.Monitor) {
 			       ROUND(COUNT(*) FILTER (WHERE status IN ('up', 'degraded'))::numeric / NULLIF(COUNT(*), 0) * 100, 2),
 			       0
 			     )
-			     FROM monitor_logs WHERE monitor_id = $3 AND checked_at > NOW() - INTERVAL '24 hours'
+			     FROM (
+			       SELECT status FROM monitor_logs
+			       WHERE monitor_id = $3
+			         AND checked_at > NOW() - INTERVAL '24 hours'
+			       ORDER BY checked_at DESC
+			       LIMIT 2880
+			     ) recent
 			   ),
 			   updated_at = NOW()
 			 WHERE id = $3`,
